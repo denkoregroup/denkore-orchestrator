@@ -100,7 +100,15 @@ create policy events_owner_select on public.events
 -- service_role has BYPASSRLS, so policies do not limit it. GRANTs do.
 -- ---------------------------------------------------------------------------
 grant select on public.projects, public.gate_approval_status to service_role;
-grant select, insert, update on public.runs, public.steps, public.gates to service_role;
+grant select, insert, update on public.runs, public.steps to service_role;
+-- Gates: the runner may open a gate and move it to a new commit, nothing else.
+-- gates.status changes only through the security definer triggers in 003
+-- (approvals_after_insert on an owner decision, gates_sha_changed on a new
+-- commit), never from the runner or webhook credential. Column grants enforce
+-- that: status, created_at and updated_at are not writable by this role.
+grant select on public.gates to service_role;
+grant insert (run_id, kind, commit_sha) on public.gates to service_role;
+grant update (commit_sha) on public.gates to service_role;
 grant select, insert on public.events to service_role;
 -- Read-only on approvals: no insert, update, or delete.
 grant select on public.approvals to service_role;
