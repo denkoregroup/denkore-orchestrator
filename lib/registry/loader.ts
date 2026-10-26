@@ -32,10 +32,12 @@ export function parseRegistryEntry(source: string, file = "<inline>"): RegistryE
 
 /** Loads and validates every registry/*.yaml file. Throws on the first invalid entry or a duplicate id. */
 export async function loadRegistry(dir = DEFAULT_REGISTRY_DIR): Promise<Map<string, RegistryEntry>> {
-  const files = (await readdir(dir)).filter((f) => /\.ya?ml$/.test(f)).sort();
+  // turbopackIgnore stops the bundler tracing the whole project for these
+  // dynamic paths; next.config.ts ships registry/*.yaml explicitly instead.
+  const files = (await readdir(/* turbopackIgnore: true */ dir)).filter((f) => /\.ya?ml$/.test(f)).sort();
   const entries = new Map<string, RegistryEntry>();
   for (const file of files) {
-    const entry = parseRegistryEntry(await readFile(path.join(dir, file), "utf8"), file);
+    const entry = parseRegistryEntry(await readFile(path.join(/* turbopackIgnore: true */ dir, file), "utf8"), file);
     if (entries.has(entry.id)) {
       throw new RegistryError(file, `duplicate registry id "${entry.id}"`);
     }
