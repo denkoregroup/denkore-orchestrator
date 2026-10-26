@@ -1,0 +1,27 @@
+/**
+ * @jest-environment node
+ */
+import { RUN_STATES } from "@/lib/state-machine/states";
+import { STEP_NAMES } from "@/lib/step-runner/types";
+import { eventKindLabel, RUN_STATE_LABELS, STEP_LABELS } from "../labels";
+
+describe("run state labels", () => {
+  it("has a label for every run state and nothing else", () => {
+    expect(Object.keys(RUN_STATE_LABELS).sort()).toEqual([...RUN_STATES].sort());
+  });
+
+  it.each(RUN_STATES)("labels %s with non-empty text", (state) => {
+    expect(RUN_STATE_LABELS[state].trim()).not.toBe("");
+  });
+
+  it("has a label for every step", () => {
+    expect(Object.keys(STEP_LABELS).sort()).toEqual([...STEP_NAMES].sort());
+  });
+});
+
+describe("eventKindLabel", () => {
+  it("labels known kinds and passes unknown kinds through", () => {
+    expect(eventKindLabel("run.created")).toBe("Run created");
+    expect(eventKindLabel("something.new")).toBe("something.new");
+  });
+});
