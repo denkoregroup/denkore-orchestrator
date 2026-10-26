@@ -3,7 +3,7 @@
  */
 import { RUN_STATES } from "@/lib/state-machine/states";
 import { STEP_NAMES } from "@/lib/step-runner/types";
-import { eventKindLabel, RUN_STATE_LABELS, STEP_LABELS } from "../labels";
+import { actorLabel, eventDescription, eventKindLabel, RUN_STATE_LABELS, STEP_LABELS } from "../labels";
 
 describe("run state labels", () => {
   it("has a label for every run state and nothing else", () => {
@@ -23,5 +23,18 @@ describe("eventKindLabel", () => {
   it("labels known kinds and passes unknown kinds through", () => {
     expect(eventKindLabel("run.created")).toBe("Run created");
     expect(eventKindLabel("something.new")).toBe("something.new");
+  });
+});
+
+describe("eventDescription and actorLabel", () => {
+  it("names the new stage for state changes", () => {
+    expect(eventDescription("run.state_changed", { from: "queued", to: "spec" })).toBe("Now: Writing the plan");
+    expect(eventDescription("run.state_changed", { to: "nonsense" })).toBe("Run moved to a new stage");
+  });
+
+  it("describes actors in words", () => {
+    expect(actorLabel("owner:6f1c2b9e-4a3d-4c1e-9b7a-2d5e8f0a1b3c")).toBe("You");
+    expect(actorLabel("system")).toBe("System");
+    expect(actorLabel("custom-bot")).toBe("custom-bot");
   });
 });

@@ -51,3 +51,25 @@ const EVENT_KIND_LABELS: Record<string, string> = {
 export function eventKindLabel(kind: string): string {
   return EVENT_KIND_LABELS[kind] ?? kind;
 }
+
+/** A one-line description that adds the new stage to state changes. */
+export function eventDescription(kind: string, payload: unknown): string {
+  if (kind === "run.state_changed" && payload && typeof payload === "object" && "to" in payload) {
+    const to = (payload as { to: unknown }).to;
+    if (typeof to === "string" && to in RUN_STATE_LABELS) {
+      return `Now: ${RUN_STATE_LABELS[to as RunState]}`;
+    }
+  }
+  return eventKindLabel(kind);
+}
+
+/** Who did it, in words. This is a single-owner app, so any owner actor is "You". */
+export function actorLabel(actor: string): string {
+  if (actor.startsWith("owner:")) return "You";
+  if (actor === "system") return "System";
+  if (actor === "runner") return "Runner";
+  return actor;
+}
+
+/** States where the run is waiting on the owner. */
+export const NEEDS_OWNER_STATES: readonly RunState[] = ["spec_gate", "design_gate", "release_gate", "escalated"];
