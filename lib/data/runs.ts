@@ -22,6 +22,7 @@ import {
   type RunRow,
   type StepRow,
 } from "./rows";
+import { totalCost } from "./totals";
 
 export const RUNS_LIMIT = 100;
 const RUN_EVENTS_LIMIT = 200;
@@ -39,10 +40,6 @@ export interface RunDetail {
   gates: GateRow[];
   events: EventRow[];
   costUsd: number;
-}
-
-export function totalCost(steps: Array<{ cost_usd: number | null }>): number {
-  return steps.reduce((sum, s) => sum + (s.cost_usd ?? 0), 0);
 }
 
 /** Newest first, with project and total step cost. */

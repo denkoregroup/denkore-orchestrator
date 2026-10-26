@@ -42,7 +42,8 @@ export const stepRow = z.object({
   /** The step output's `result` object (see record_step_completion in 003). */
   output: z.record(z.string(), z.unknown()).nullable(),
   commit_sha: sha.nullable(),
-  pr_url: z.string().nullable(),
+  // Matches the https-only check on steps.pr_url; it is rendered as a link.
+  pr_url: z.string().regex(/^https:\/\//).nullable(),
   cost_usd: numeric.nullable(),
   dispatched_at: z.string(),
   completed_at: z.string().nullable(),
