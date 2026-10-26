@@ -87,12 +87,11 @@ create policy approvals_owner_insert on public.approvals
 
 create policy events_owner_select on public.events
   for select to authenticated
+  -- Events with no run are visible only to a user who owns at least one project.
   using (
-    run_id is null
-    or exists (
-      select 1 from public.runs r join public.projects p on p.id = r.project_id
-      where r.id = events.run_id and p.owner_id = (select auth.uid())
-    )
+    (run_id is null and exists (select 1 from public.projects p where p.owner_id = (select auth.uid())))
+    or exists (select 1 from public.runs r join public.projects p on p.id = r.project_id
+               where r.id = events.run_id and p.owner_id = (select auth.uid()))
   );
 
 -- ---------------------------------------------------------------------------
