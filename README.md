@@ -29,9 +29,25 @@ cp .env.example .env.local   # fill in values
 pnpm dev
 ```
 
-Database: paste `supabase/sql/001_tables.sql`, `002_rls.sql`, then
-`003_functions.sql` into the Supabase SQL editor. Nothing runs migrations
-automatically.
+The database is set up by hand; see [Supabase setup](#supabase-setup).
+
+## Supabase setup
+
+1. Create the project in a paid organization. Free projects pause after a week
+   of inactivity, and a paused project drops incoming webhooks.
+2. In the SQL editor, run `supabase/sql/001_tables.sql`, `002_rls.sql`, then
+   `003_functions.sql`, in that order. Nothing runs migrations automatically.
+3. Under Authentication, turn off **Allow new users to sign up**. Create the
+   owner user by hand and put its UUID in `DENKORE_OWNER_USER_ID`.
+4. Edit the **Magic Link** email template so the link is:
+
+   ```
+   {{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=email
+   ```
+
+5. Under URL Configuration, set the **Site URL** to the production URL and add
+   redirect URLs for local and production, for example
+   `http://localhost:3000/**` and `https://<production-domain>/**`.
 
 ## Test
 
