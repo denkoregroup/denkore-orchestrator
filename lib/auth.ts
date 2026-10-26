@@ -10,7 +10,7 @@ export interface Owner {
 
 /**
  * Data Access Layer check: the proxy already redirects strangers, but every
- * server read of private data should call this too. Must run inside <Suspense>.
+ * server read of private data should call this too.
  */
 export async function requireOwner(): Promise<Owner> {
   const supabase = await createClient();
