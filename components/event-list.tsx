@@ -23,17 +23,12 @@ export function EventList({ events, showRunLink = false }: { events: EventItem[]
               <LocalTime iso={event.created_at} />
             </p>
           </div>
-          <p className="text-sm text-muted">
-            By {actorLabel(event.actor)}
-            {showRunLink && event.run_id && (
-              <>
-                {" · "}
-                <Link href={`/runs/${event.run_id}`} className="underline">
-                  Open run
-                </Link>
-              </>
-            )}
-          </p>
+          <p className="text-sm text-muted">By {actorLabel(event.actor)}</p>
+          {showRunLink && event.run_id && (
+            <Link href={`/runs/${event.run_id}`} className="flex min-h-12 items-center text-sm underline">
+              Open run
+            </Link>
+          )}
           <details className="text-sm">
             <summary className="min-h-12 cursor-pointer content-center text-muted">
               Details <span className="sr-only">for this event</span>
