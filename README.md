@@ -21,7 +21,7 @@ Single user: only the Supabase Auth user in `DENKORE_OWNER_USER_ID` can sign in.
 | `lib/registry/` | Zod schema and loader for `registry/*.yaml` |
 | `lib/webhooks/` | HMAC verification and the idempotent step-complete handler |
 | `supabase/sql/` | Schema, RLS, and triggers to paste into Supabase by hand |
-| `scripts/registry-sync.ts` | `pnpm registry:sync`: upserts one project per registry entry (the only user of the service-role key outside the webhook) |
+| `scripts/registry-sync.ts` | `pnpm registry:sync`: upserts one project per registry entry (the only user of the secret key `SUPABASE_SECRET_KEY` besides the webhook) |
 
 ## Run
 
@@ -53,7 +53,12 @@ The database is set up by hand; see [Supabase setup](#supabase-setup).
 5. Under URL Configuration, set the **Site URL** to the production URL and add
    redirect URLs for local and production, for example
    `http://localhost:3000/**` and `https://<production-domain>/**`.
-6. Put `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` and
+6. Under **Settings > API Keys > "Publishable and secret API keys"**, copy the
+   publishable key into `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` and a secret key
+   (`sb_secret_...`) into `SUPABASE_SECRET_KEY`. The secret key is server only:
+   it acts as the `service_role` Postgres role, so never expose it to the
+   browser. Then deactivate the legacy `anon` and `service_role` keys.
+7. Put `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SECRET_KEY` and
    `DENKORE_OWNER_USER_ID` in `.env.local`, then run `pnpm registry:sync`. It
    creates one project per `registry/*.yaml` entry and prints what it inserted,
    changed, or left alone. Run it again whenever the registry changes.

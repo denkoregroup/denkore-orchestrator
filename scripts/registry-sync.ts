@@ -3,7 +3,9 @@
  *
  * Upserts one `projects` row per registry/*.yaml entry, owned by
  * DENKORE_OWNER_USER_ID. Reads env from .env.local when present.
- * Uses the service-role key; this script is the only place that does.
+ * Uses SUPABASE_SECRET_KEY, a Supabase secret key (sb_secret_...) that acts
+ * as the service_role Postgres role. Server only; besides this script, only
+ * the step-complete webhook uses it, never pages or actions.
  * Never prints key values.
  */
 import { createClient } from "@supabase/supabase-js";
@@ -13,7 +15,7 @@ import { planRegistrySync } from "../lib/registry/sync";
 
 const REQUIRED_ENV = [
   "NEXT_PUBLIC_SUPABASE_URL",
-  "SUPABASE_SERVICE_ROLE_KEY",
+  "SUPABASE_SECRET_KEY",
   "DENKORE_OWNER_USER_ID",
 ] as const;
 
@@ -43,7 +45,7 @@ async function main() {
 
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    process.env.SUPABASE_SECRET_KEY!,
     { auth: { persistSession: false, autoRefreshToken: false } },
   );
 
