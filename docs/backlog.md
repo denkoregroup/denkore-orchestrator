@@ -110,3 +110,47 @@ the env vars, walk through:
    decided."
 10. As service role, try to insert into `approvals` and update `gates.status`:
     both are refused.
+
+## Detect a step that never completes
+
+**Why:** A dispatched step waits forever if the runner dies or its completion
+webhook is lost. The tick route re-checks the run, but `decide()` just keeps
+waiting on a `dispatched` step.
+
+**Suggested fix:** In `decide()`, treat a step that has been `dispatched` for
+longer than `LIMITS.stepTimeoutSeconds` plus a margin as failed (or escalate
+with "The step didn't finish in time"). Log a `conductor.step_timed_out`
+event so the owner can see what happened.
+
+## Call the tick route on a schedule
+
+**Why:** `POST /api/conductor/tick` exists but nothing calls it, so a run
+that misses its trigger (a failed `after()`, a lost webhook) stalls until the
+next decision or completion.
+
+**Suggested fix:** Either a Vercel Cron job (it would need the HMAC signature,
+so a small signed-request helper or a separate cron secret check) or a
+scheduled GitHub workflow that signs `{}` with `STEP_WEBHOOK_SECRET` and posts
+it every few minutes.
+
+## Reopen a changes-requested gate at the same SHA
+
+**Why:** If the owner asks for changes and the redo produces the same commit,
+the run escalates ("no change was produced"). That is the safe default, but
+sometimes the owner just wants to re-review the same commit (they asked for
+changes by mistake, or the change was made outside the run).
+
+**Suggested fix:** A security definer SQL function the owner can call to
+reset a `changes_requested` gate to `pending` at its current SHA, logged as
+an event, plus a "Review again" button on an escalated run.
+
+## Real GitHub dispatch
+
+**Why:** The runner is still the stub: it builds the `workflow_dispatch`
+request but never sends it, so no agent runs.
+
+**Suggested fix:** Install a GitHub App on the project repos, mint an
+installation token per dispatch, and send the request the stub builds.
+Agree the agent workflow file name (`RUNNER_WORKFLOW` is a placeholder) and
+review the tool allowlists in `lib/conductor/contract.ts` first; they are
+placeholders too.

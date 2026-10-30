@@ -20,8 +20,10 @@ Single user: only the Supabase Auth user in `DENKORE_OWNER_USER_ID` can sign in.
 | `lib/step-runner/` | `StepRunner` interface and a stub GitHub Actions runner |
 | `lib/registry/` | Zod schema and loader for `registry/*.yaml` |
 | `lib/webhooks/` | HMAC verification and the idempotent step-complete handler |
+| `lib/conductor/` | The Conductor: `decide()` (pure next action), `advanceRun()` (applies it), the shared agent contract, limits, and its stores |
 | `supabase/sql/` | Schema, RLS, and triggers to paste into Supabase by hand |
-| `scripts/registry-sync.ts` | `pnpm registry:sync`: upserts one project per registry entry (the only user of the secret key `SUPABASE_SECRET_KEY` besides the webhook) |
+| `scripts/registry-sync.ts` | `pnpm registry:sync`: upserts one project per registry entry |
+| `scripts/simulate-step.ts` | `pnpm conductor:simulate`: fakes a step completion for hand testing |
 
 ## Run
 
@@ -62,6 +64,58 @@ The database is set up by hand; see [Supabase setup](#supabase-setup).
    `DENKORE_OWNER_USER_ID` in `.env.local`, then run `pnpm registry:sync`. It
    creates one project per `registry/*.yaml` entry and prints what it inserted,
    changed, or left alone. Run it again whenever the registry changes.
+
+## Conductor
+
+The Conductor moves each run through its states on its own. It dispatches
+each step to the runner, reacts to completions and to your decisions, and
+escalates when a run needs you. The runner is still a stub: nothing is sent
+anywhere yet.
+
+**How a run moves.** `advanceRun(runId)` loads the run, asks `decide()` for
+the single next action, applies it, and repeats, at most 10 times:
+
+- A new run starts and its plan step is dispatched.
+- When a step finishes, the run moves on: plan and design go to a review gate
+  at the step's commit, tests and final checks loop until they pass (up to the
+  run's retry limit), go-live is followed by a live site check, then done.
+- At a gate it waits for you. Approve moves forward; request changes sends it
+  back with your note included in the next step's task. If the redo produces
+  the same commit, it escalates ("no change was produced").
+- It escalates when a step fails where retrying makes no sense, after too
+  many test failures, more than 20 steps, or more than $15 of cost. These
+  limits are starting values in `lib/conductor/limits.ts`. Escalations show
+  on the run's history with the reason.
+
+State changes are compare-and-set on the run's state and `updated_at`, and
+step and gate rows are protected by their unique keys, so two callers can
+never apply the same move twice. The Conductor writes with the secret key
+(`service_role`), which still cannot write approvals.
+
+**Triggers.** It runs after the response is sent (`after()`), when:
+
+1. you start a run on `/prompt`,
+2. you approve or request changes on `/approvals`,
+3. the step-complete webhook records a new completion (never for a replay).
+
+**Tick route.** `POST /api/conductor/tick` is the safety net for runs that
+stall: it advances up to 25 unfinished runs, oldest first. It is signed like
+the webhook (HMAC-SHA256 of the raw body with `STEP_WEBHOOK_SECRET`, in
+`x-denkore-signature: sha256=<hex>`). Nothing calls it on a schedule yet.
+
+**Simulator.** With `pnpm dev` running and `STEP_WEBHOOK_SECRET` in
+`.env.local`, fake the step a run is waiting on:
+
+```sh
+pnpm conductor:simulate --url http://localhost:3000 --run <run id> --step spec
+pnpm conductor:simulate --url http://localhost:3000 --run <run id> --state build_test --fail
+pnpm conductor:simulate --url http://localhost:3000 --run <run id> --step build_test --attempt 2
+```
+
+`--step` names the step, or `--state` infers it from the run's state. Pass
+`--attempt <n>` to complete a retry (the run page shows the try number).
+It refuses any URL that is not localhost unless you add `--allow-remote`,
+and prints what it sent, never the secret.
 
 ## Test
 
