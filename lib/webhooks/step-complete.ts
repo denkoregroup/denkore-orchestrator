@@ -37,6 +37,8 @@ function json(body: unknown, status: number) {
 export function createStepCompleteHandler(deps: {
   secret: string | undefined;
   store: () => StepCompletionStore;
+  /** Called only for a newly recorded completion, never for a replay. */
+  onRecorded?: (payload: StepCompletePayload) => void;
 }) {
   return async function handle(request: Request): Promise<Response> {
     if (!deps.secret) return json({ error: "webhook not configured" }, 500);
@@ -59,6 +61,7 @@ export function createStepCompleteHandler(deps: {
     }
 
     const outcome = await deps.store().record(payload.data);
+    if (outcome === "recorded") deps.onRecorded?.(payload.data);
     // Replays are acknowledged (so the sender stops retrying) but never re-applied.
     return json({ status: outcome, stepKey: payload.data.stepKey }, 200);
   };
