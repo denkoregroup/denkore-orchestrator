@@ -8,6 +8,8 @@
  *
  * Pages and server actions never import this file. They reach it only by
  * calling advanceRun (lib/conductor/advance.ts), usually inside after().
+ * The HMAC-signed tick route (app/api/conductor/tick) also uses it to list
+ * the runs to advance.
  */
 import "server-only";
 import { z } from "zod";
