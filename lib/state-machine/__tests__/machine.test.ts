@@ -1,7 +1,7 @@
 /**
  * @jest-environment node
  */
-import { approveGate, isGateApproved, openGate, updateGateSha } from "../gates";
+import { openGate, updateGateSha } from "../gates";
 import { createRun, transition, type RunContext, type RunEvent } from "../machine";
 import { RUN_STATES, TERMINAL_STATES, type RunState } from "../states";
 
@@ -16,10 +16,7 @@ function apply(run: RunContext, ...events: RunEvent[]): RunContext {
   }, run);
 }
 
-function approveCurrent(run: RunContext, sha = SHA_A): RunContext {
-  if (!run.gate) throw new Error("no gate");
-  return { ...run, gate: approveGate(run.gate, { approvedBy: "owner", commitSha: sha }) };
-}
+const approve = (commitSha = SHA_A): RunEvent => ({ type: "approve", approvedBy: "owner", commitSha });
 
 /** Drives a fresh run into `state` along the happy path. */
 function runAt(state: RunState, maxTestRetries = 3): RunContext {
@@ -27,12 +24,12 @@ function runAt(state: RunState, maxTestRetries = 3): RunContext {
   const path: Array<(r: RunContext) => RunContext> = [
     (r) => apply(r, { type: "start" }),
     (r) => apply(r, { type: "spec_ready", commitSha: SHA_A }),
-    (r) => apply(approveCurrent(r), { type: "approve" }),
+    (r) => apply(r, approve()),
     (r) => apply(r, { type: "design_ready", commitSha: SHA_A }),
-    (r) => apply(approveCurrent(r), { type: "approve" }),
+    (r) => apply(r, approve()),
     (r) => apply(r, { type: "tests_passed" }),
     (r) => apply(r, { type: "verify_passed", commitSha: SHA_A }),
-    (r) => apply(approveCurrent(r), { type: "approve" }),
+    (r) => apply(r, approve()),
     (r) => apply(r, { type: "deployed" }),
     (r) => apply(r, { type: "check_passed" }),
   ];
@@ -52,7 +49,7 @@ const ALL_EVENTS: RunEvent[] = [
   { type: "tests_failed" },
   { type: "verify_passed", commitSha: SHA_A },
   { type: "verify_failed" },
-  { type: "approve" },
+  approve(),
   { type: "request_changes" },
   { type: "gate_sha_changed", commitSha: SHA_B },
   { type: "deployed" },
@@ -78,7 +75,7 @@ describe("happy path", () => {
 
   it("stores the commit SHA on gates it opens", () => {
     const run = runAt("spec_gate");
-    expect(run.gate).toEqual({ kind: "spec", commitSha: SHA_A, approval: null });
+    expect(run.gate).toEqual({ kind: "spec", commitSha: SHA_A });
   });
 });
 
@@ -111,8 +108,7 @@ describe("event-driven transitions", () => {
   );
 
   it.each(cases)("%s + %o", (state, event) => {
-    let run = runAt(state);
-    if (event.type === "approve" && run.gate) run = approveCurrent(run);
+    const run = runAt(state);
     const result = transition(run, event);
     const abort = { fail: "failed", cancel: "cancelled", escalate: "escalated" } as const;
     const expected =
@@ -148,44 +144,47 @@ describe("event-driven transitions", () => {
 });
 
 describe("gate approvals", () => {
-  it("refuses to pass a gate without an approval", () => {
-    const result = transition(runAt("spec_gate"), { type: "approve" });
+  it("passes the gate when the approval is for the gate's SHA, and records it", () => {
+    const result = transition(runAt("spec_gate"), approve(SHA_A));
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.run.state).toBe("design");
+    expect(result.run.approvals).toEqual([{ kind: "spec", approvedBy: "owner", commitSha: SHA_A }]);
+  });
+
+  it("rejects an approval for a different SHA than the gate covers", () => {
+    const result = transition(runAt("spec_gate"), approve(SHA_B));
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toMatch(/gate covers/);
+  });
+
+  it("rejects an approval with no approver", () => {
+    const result = transition(runAt("spec_gate"), { type: "approve", approvedBy: "", commitSha: SHA_A });
     expect(result.ok).toBe(false);
   });
 
-  it("refuses an approval for a different SHA than the gate covers", () => {
-    const gate = openGate("release", SHA_A);
-    expect(() => approveGate(gate, { approvedBy: "owner", commitSha: SHA_B })).toThrow();
-  });
-
-  it("voids the approval when the gate SHA changes", () => {
-    const approved = approveCurrent(runAt("release_gate"));
-    expect(isGateApproved(approved.gate!)).toBe(true);
-
-    const moved = apply(approved, { type: "gate_sha_changed", commitSha: SHA_B });
+  it("only accepts the new SHA after the gate moves", () => {
+    const moved = apply(runAt("release_gate"), { type: "gate_sha_changed", commitSha: SHA_B });
     expect(moved.gate?.commitSha).toBe(SHA_B);
-    expect(moved.gate?.approval).toBeNull();
-    expect(isGateApproved(moved.gate!)).toBe(false);
-    expect(transition(moved, { type: "approve" }).ok).toBe(false);
-
-    // A fresh approval for the new SHA is accepted.
-    const reapproved = approveCurrent(moved, SHA_B);
-    expect(apply(reapproved, { type: "approve" }).state).toBe("deploy");
+    expect(transition(moved, approve(SHA_A)).ok).toBe(false);
+    expect(apply(moved, approve(SHA_B)).state).toBe("deploy");
   });
 
-  it("treats a stale approval as invalid even if left on the gate", () => {
-    const gate = approveGate(openGate("spec", SHA_A), { approvedBy: "owner", commitSha: SHA_A });
-    expect(isGateApproved({ ...gate, commitSha: SHA_B })).toBe(false);
-  });
-
-  it("keeps the approval when the SHA is unchanged", () => {
-    const gate = approveGate(openGate("spec", SHA_A), { approvedBy: "owner", commitSha: SHA_A });
+  it("keeps the gate unchanged when the SHA is unchanged", () => {
+    const gate = openGate("spec", SHA_A);
     expect(updateGateSha(gate, SHA_A)).toBe(gate);
   });
 
   it("clears the gate after leaving the gate state", () => {
-    const run = apply(approveCurrent(runAt("spec_gate")), { type: "approve" });
-    expect(run.gate).toBeNull();
+    expect(apply(runAt("spec_gate"), approve()).gate).toBeNull();
+  });
+
+  it("records one approval per gate on the happy path", () => {
+    expect(runAt("done").approvals.map((a) => a.kind)).toEqual(["spec", "design", "release"]);
+  });
+
+  it("does not record an approval when changes are requested", () => {
+    expect(apply(runAt("spec_gate"), { type: "request_changes" }).approvals).toEqual([]);
   });
 });
 

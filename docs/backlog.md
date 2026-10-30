@@ -2,19 +2,6 @@
 
 Known follow-ups, deliberately not done yet.
 
-## Carry the approval in the `approve` event
-
-**Why:** Today a caller approves by replacing `run.gate` with `approveGate(...)`
-and then sends `{ type: "approve" }`. The reducer only sees the result, so the
-approval is set up outside the state machine, and nothing stops a caller from
-building an approved gate by hand.
-
-**Suggested fix:** Change the event to
-`{ type: "approve"; approvedBy: string; commitSha: string }`. In the reducer,
-reject it unless `commitSha` equals the gate's current SHA, then record the
-approval and move forward in the same step. Remove the need to mutate the gate
-before calling `transition`.
-
 ## Webhook: unknown run ID causes endless retries; step key is not checked
 
 **Why:** A completion for a `runId` that does not exist fails the foreign key in
