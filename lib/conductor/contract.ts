@@ -72,3 +72,6 @@ export function buildStepInput(input: {
     branch: branchFor(input.runId),
   };
 }
+
+/** PLACEHOLDER: the agent workflow the stub runner would dispatch in each project's repo. */
+export const RUNNER_WORKFLOW = "denkore-step.yml";
