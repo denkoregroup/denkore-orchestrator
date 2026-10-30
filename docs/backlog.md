@@ -60,3 +60,66 @@ Code-owner review becomes useful once others contribute.
 **Suggested fix:** When more developers join (expected in year 2–3), add
 `.github/CODEOWNERS` for `.github/`, `supabase/sql/`, and test files. Turn on
 "Require review from Code Owners" in the branch ruleset.
+
+## Live updates with Supabase Realtime
+
+**Why:** `/runs`, `/runs/[id]`, `/approvals` and `/audit` show data as of page
+load. The owner has to refresh to see a run move or a new gate appear.
+
+**Suggested fix:** Subscribe to `postgres_changes` on `runs`, `gates` and
+`events` from a small client component, and call `router.refresh()` when a
+change arrives. Realtime respects RLS, so the owner only receives their own
+rows. Add the tables to the `supabase_realtime` publication in a new SQL file.
+
+## Cancel a run
+
+**Why:** There is no way to stop a run from the app. `cancelled` exists in the
+state machine, but the owner cannot write `runs.state` (by design).
+
+**Suggested fix:** Add a security definer SQL function `cancel_run(run_id)`
+that checks the caller owns the run, checks the move is allowed (not from a
+terminal state), and updates the state. The existing trigger logs it. Expose
+it as a confirm-first button on `/runs/[id]`.
+
+## Attachments on prompts
+
+**Why:** Prompts are text only. Screenshots, briefs, or brand files have to be
+described in words.
+
+**Suggested fix:** Store files in a private Supabase Storage bucket with an
+owner-only policy, keep their paths in a `run_attachments` table, and pass
+signed URLs to the Conductor when it picks up the run.
+
+## Pagination on /runs
+
+**Why:** `/runs` shows the newest 100 runs and says so; older runs are only
+reachable by URL or through the audit log.
+
+**Suggested fix:** Keyset pagination on `(created_at, id)` with a "Load more"
+button, like `/audit`.
+
+## Manual end-to-end checklist (once the database exists)
+
+**Why:** CI uses a fake Supabase client, and the SQL has only been run
+against a local Postgres stand-in. Nothing has been checked against a real
+Supabase project.
+
+**Suggested fix:** After creating the project, applying 001–004 and setting
+the env vars, walk through:
+
+1. `pnpm registry:sync` inserts `example-app`; a second run says `unchanged`.
+2. Sign in by magic link as the owner. Another email cannot sign in.
+3. `/prompt`: a 5-character prompt is refused; a real one opens `/runs/[id]`
+   showing "Waiting to start".
+4. `/audit` shows "Run created" by "You" for that run, and the run filter works.
+5. As service role, insert a gate and a succeeded step with
+   `result.gateReview`. `/approvals` shows the card with the summary.
+6. One-tap gate: Approve works and the card disappears with a confirmation.
+7. PR-review gate: Approve stays disabled until the box is ticked; the note
+   stored is the review wording.
+8. Open a gate card, change the gate's `commit_sha` as service role, then
+   approve: "This changed since you opened it. Refresh to see the latest."
+9. Approve the same gate from two tabs: the second says "This was already
+   decided."
+10. As service role, try to insert into `approvals` and update `gates.status`:
+    both are refused.

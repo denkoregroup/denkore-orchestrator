@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "next typegen && tsc --noEmit",
-    "test": "jest"
+    "test": "jest",
+    "registry:sync": "TS_NODE_PROJECT=scripts/tsconfig.json node --env-file-if-exists=.env.local -r ts-node/register scripts/registry-sync.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",

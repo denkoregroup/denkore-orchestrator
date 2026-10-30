@@ -1,22 +1,30 @@
 import type { GateKind } from "@/lib/state-machine";
+import type { GateReviewSummary } from "./schema";
+
+export type ApprovalMode = "one_tap" | "pr_review";
+
+export interface GateCheck {
+  name: string;
+  status: "passed" | "failed" | "pending";
+}
 
 /** What the owner sees at a gate. Business fields lead; technical detail is secondary. */
 export interface GateReview {
-  id: string;
+  gateId: string;
+  runId: string;
   project: string;
   kind: GateKind;
-  approval: "one_tap" | "pr_review";
-  /** One sentence, no jargon: what happens if this is approved. */
-  headline: string;
-  summary: string;
-  changes: string[];
-  risks: string[];
+  approval: ApprovalMode;
+  /** From the step output's result.gateReview; null when missing or invalid. Never invented. */
+  summary: GateReviewSummary | null;
   technical: {
+    /** The SHA shown to the owner, and the one the approval is recorded against. */
     commitSha: string;
-    branch: string;
+    branch?: string;
     prUrl?: string;
-    checks: Array<{ name: string; status: "passed" | "failed" | "pending" }>;
-    filesChanged: number;
-    costUsd: number;
+    checks?: GateCheck[];
+    filesChanged?: number;
+    /** Total reported cost of the run so far, or null if no step reported one. */
+    costUsd: number | null;
   };
 }
