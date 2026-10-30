@@ -1,0 +1,38 @@
+# Example registry entry. Integrations list env var NAMES only, never values.
+id: example-app
+repo: denkoregroup/example-app
+gateTier: app
+hosting:
+  provider: vercel
+  project: example-app
+stack:
+  - nextjs
+  - typescript
+  - tailwind
+  - supabase
+design:
+  system: denkore-base
+  source: figma
+integrations:
+  - name: supabase
+    envVars:
+      - NEXT_PUBLIC_SUPABASE_URL
+      - NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+  - name: resend
+    envVars:
+      - RESEND_API_KEY
+phase: build
+tracker:
+  provider: github
+  project: denkoregroup/example-app
+backlog: docs/backlog.md
+constraints:
+  - Mobile-first; every flow must work at 360px width.
+  - No new third-party services without a spec gate.
+gates:
+  oneTap:
+    - spec
+    - design
+  prReview:
+    - release
+criticalFlowsPath: tests/critical-flows
