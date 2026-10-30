@@ -7,7 +7,8 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    // Skip static assets and the machine-to-machine webhook (it authenticates by HMAC).
-    "/((?!_next/static|_next/image|favicon.ico|api/webhooks|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    // Skip static assets and the machine-to-machine routes (the step-complete
+    // webhook and the Conductor tick), which authenticate by HMAC instead.
+    "/((?!_next/static|_next/image|favicon.ico|api/webhooks|api/conductor|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };
