@@ -14,6 +14,16 @@ export const integration = z.strictObject({
   envVars: z.array(envVarName).min(1),
 });
 
+/**
+ * Public-URL site audits (pnpm audit:run --project <id>). Only what slice 1
+ * uses; later slices add their own fields when they need them.
+ */
+export const auditsConfig = z.strictObject({
+  url: z.url({ protocol: /^https?$/ }),
+  maxPages: z.number().int().positive().max(500).optional(),
+  ignorePaths: z.array(z.string().startsWith("/", "must start with /")).optional(),
+});
+
 export const registryEntrySchema = z
   .strictObject({
     id: z.string().regex(/^[a-z0-9][a-z0-9-]*$/, "lowercase kebab-case"),
@@ -41,6 +51,7 @@ export const registryEntrySchema = z
       prReview: z.array(gateKind).default([]),
     }),
     criticalFlowsPath: z.string().min(1),
+    audits: auditsConfig.optional(),
   })
   .superRefine((entry, ctx) => {
     const overlap = entry.gates.oneTap.filter((g) => entry.gates.prReview.includes(g));

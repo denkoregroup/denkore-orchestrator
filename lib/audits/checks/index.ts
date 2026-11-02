@@ -42,5 +42,7 @@ export const CHECKS: readonly Check[] = [
 ];
 
 export function runChecks(crawl: CrawlResult): Finding[] {
+  // If the homepage never answered, the only true finding is that it doesn't load.
+  if (!crawl.homepageResponded) return checkLinks(crawl);
   return CHECKS.flatMap((check) => check(crawl));
 }

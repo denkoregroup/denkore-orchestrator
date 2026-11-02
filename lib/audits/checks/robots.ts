@@ -5,6 +5,7 @@ import { finding, type Finding } from "../types";
 /** robots.txt exists and doesn't tell search engines to skip the whole site. */
 export function checkRobots(crawl: CrawlResult): Finding[] {
   const robots = crawl.site.robots;
+  if (!robots) return [];
   if (robots.error || robots.status !== 200) {
     return [
       finding({
