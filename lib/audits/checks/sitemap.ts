@@ -5,7 +5,8 @@ import { finding, type Finding } from "../types";
 
 /** A sitemap exists, parses, and lists only pages on this site that load. */
 export function checkSitemap(crawl: CrawlResult): Finding[] {
-  const { sitemaps, sitemapUrls } = crawl.site;
+  const { sitemaps, sitemapUrls, robots } = crawl.site;
+  if (robots === null) return []; // probes were skipped
   const loaded = sitemaps.filter((s) => !s.fetch.error && s.fetch.status === 200);
   const findings: Finding[] = [];
 
