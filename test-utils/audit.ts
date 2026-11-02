@@ -72,6 +72,7 @@ export function crawlOf(input: {
   const target = input.target ?? `${SITE}/`;
   return {
     target,
+    homepageResponded: true,
     pages: input.pages ?? [page(target, cleanHtml())],
     linkedFrom: input.linkedFrom ?? {},
     site: {

@@ -246,6 +246,15 @@ describe("page.broken-link and site.start", () => {
   });
 });
 
+describe("a homepage that never answers", () => {
+  it("reports only that it doesn't load, nothing it didn't check", () => {
+    const crawl = crawlOf({ pages: [{ url: HOME, facts: null, fetch: fetched(HOME, { status: null, headers: {}, error: { kind: "network", message: "ENOTFOUND" } }) }] });
+    crawl.homepageResponded = false;
+    crawl.site = { httpVersion: null, altHost: null, robots: null, sitemaps: [], sitemapUrls: [] };
+    expect(keys(runChecks(crawl))).toEqual(["site.start:fail"]);
+  });
+});
+
 describe("site.security-headers", () => {
   it("notes each missing header at info level only, never warn or fail", () => {
     const crawl = crawlOf({ pages: [page(HOME, cleanHtml(), { headers: { "content-type": "text/html" } })] });

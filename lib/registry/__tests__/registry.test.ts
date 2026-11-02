@@ -57,3 +57,29 @@ describe("registry", () => {
     await expect(loadRegistry(dir)).rejects.toThrow(/duplicate registry id/);
   });
 });
+
+describe("registry audits block", () => {
+  it("is optional, and the example entry has one", async () => {
+    const entry = await exampleObject();
+    expect(entry.audits).toEqual({ url: "https://example.com", maxPages: 10, ignorePaths: ["/admin"] });
+    const withoutAudits: Partial<typeof entry> = { ...entry };
+    delete withoutAudits.audits;
+    expect(() => parseRegistryEntry(stringify(withoutAudits))).not.toThrow();
+  });
+
+  it("requires a url inside the block", async () => {
+    const entry = { ...(await exampleObject()), audits: { maxPages: 5 } };
+    expect(() => parseRegistryEntry(stringify(entry))).toThrow(/url/);
+  });
+
+  it("accepts only url, maxPages and ignorePaths", async () => {
+    const entry = { ...(await exampleObject()), audits: { url: "https://example.com", propertyId: "G-123" } };
+    expect(() => parseRegistryEntry(stringify(entry))).toThrow(/propertyId/);
+  });
+
+  it("rejects a non-web url and ignore paths that don't start with /", async () => {
+    const base = await exampleObject();
+    expect(() => parseRegistryEntry(stringify({ ...base, audits: { url: "ftp://example.com" } }))).toThrow(RegistryError);
+    expect(() => parseRegistryEntry(stringify({ ...base, audits: { url: "https://example.com", ignorePaths: ["admin"] } }))).toThrow(/start with/);
+  });
+});

@@ -21,7 +21,8 @@ export interface SiteProbes {
   httpVersion: FetchResult | null;
   /** The www / non-www counterpart; null for IP addresses and localhost. */
   altHost: FetchResult | null;
-  robots: FetchResult;
+  /** null when the probes were skipped because the homepage got no response. */
+  robots: FetchResult | null;
   sitemaps: SitemapFetch[];
   /** Every <loc> found in the sitemaps, in order, de-duplicated. */
   sitemapUrls: string[];
@@ -30,6 +31,11 @@ export interface SiteProbes {
 /** Everything the checks see. Checks are pure functions of this. */
 export interface CrawlResult {
   target: string;
+  /**
+   * False when the homepage got no HTTP response at all (DNS, refused,
+   * timeout, blocked). Then nothing else was fetched, and only that is reported.
+   */
+  homepageResponded: boolean;
   site: SiteProbes;
   /** pages[0] is the target itself. */
   pages: PageResult[];

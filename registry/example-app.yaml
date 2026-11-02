@@ -36,3 +36,9 @@ gates:
   prReview:
     - release
 criticalFlowsPath: tests/critical-flows
+# Public-URL site audit (pnpm audit:run --project example-app). Not synced to Supabase.
+audits:
+  url: https://example.com
+  maxPages: 10
+  ignorePaths:
+    - /admin
