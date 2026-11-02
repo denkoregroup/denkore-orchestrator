@@ -22,6 +22,8 @@ Single user: only the Supabase Auth user in `DENKORE_OWNER_USER_ID` can sign in.
 | `lib/webhooks/` | HMAC verification and the idempotent step-complete handler |
 | `supabase/sql/` | Schema, RLS, and triggers to paste into Supabase by hand |
 | `scripts/registry-sync.ts` | `pnpm registry:sync`: upserts one project per registry entry (the only user of the secret key `SUPABASE_SECRET_KEY` besides the webhook) |
+| `lib/audits/` | Public-URL site auditor: fetcher (the only network code), crawl, one module per check in `checks/`, report format |
+| `scripts/audit-run.ts` | `pnpm audit:run`: audits a site and writes the findings JSON |
 
 ## Run
 
@@ -62,6 +64,56 @@ The database is set up by hand; see [Supabase setup](#supabase-setup).
    `DENKORE_OWNER_USER_ID` in `.env.local`, then run `pnpm registry:sync`. It
    creates one project per `registry/*.yaml` entry and prints what it inserted,
    changed, or left alone. Run it again whenever the registry changes.
+
+## Site audits
+
+`pnpm audit:run` audits a public website: it reads a handful of pages on the
+same site, runs fixed checks, prints a plain-language summary, and writes the
+findings to a JSON file. No model calls, no credentials, no database.
+
+```sh
+pnpm audit:run --url https://example.com
+pnpm audit:run --project example-app          # uses the registry entry's audits block
+pnpm audit:run --url https://example.com --max-pages 10 --out report.json --fail-on warn
+```
+
+| Flag | Meaning |
+| --- | --- |
+| `--url` / `--project` | The site, or a registry entry whose `audits` block names it (`url`, optional `maxPages`, `ignorePaths`). Pass one. |
+| `--max-pages` | Pages to read, default 25. |
+| `--out` | Where to write the report, default `./audit-report.json` (git-ignored). |
+| `--fail-on warn\|fail` | Exit with code 1 if there are findings at that level or worse. Default: never. |
+
+**What it checks.** https and the http-to-https redirect, redirect chains and
+redirects to other sites, www consistency, robots.txt, the sitemap, broken
+internal links, server response time, security headers (informational only),
+and on every page: title, description, one main heading, language, phone
+viewport, canonical link, Open Graph tags, image alt text and structured data
+(JSON-LD).
+
+**How it behaves.** One request at a time, about 250 ms apart, with the user
+agent `DenkoreAudit/1.0 (+https://denkoregroup.com)`. It stays on the site:
+a redirect to another site is reported, never followed. It refuses private,
+loopback and link-local addresses. Each request has a 10 s deadline and a
+2 MB size cap. It respects robots.txt and honours `HTTPS_PROXY` / `NO_PROXY`.
+
+**Finding format** (`lib/audits/types.ts`, `schemaVersion: 1`). The report is
+`{ schemaVersion, target, startedAt, finishedAt, pagesChecked, findings, counts }`;
+each finding is `{ id, check, severity, url, message, evidence? }`.
+
+- `severity` is `fail` (clearly broken), `warn` (worth fixing) or `info`.
+- `id` is a stable fingerprint of the check, the normalized URL and a
+  check-specific key, so the same problem has the same id on every run.
+  Later slices diff runs by id; changing how ids are made is a breaking change.
+- `message` is written for the site owner, not a developer.
+- Findings are sorted the same way every run: severity, check, URL, id.
+
+**Later slices.** This is layer 1 of the "Scheduled audits" design: later
+slices store this output, run it on a schedule, and triage it, using these
+ids to tell new problems from known ones. The items held back for them
+(storage, scheduling, an owner-facing view, model triage, Lighthouse and axe
+checks) are in `docs/backlog.md`. The exact split into slices 2 to 6 follows
+that design doc, which is not in this repository.
 
 ## Test
 
