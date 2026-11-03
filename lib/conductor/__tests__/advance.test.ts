@@ -9,6 +9,7 @@ import { GitHubActionsRunner } from "@/lib/step-runner/github-actions";
 import type { StepInput } from "@/lib/step-runner/types";
 import { advanceRun, ESCALATION_REASONS, type ConductorDeps } from "../advance";
 import { REASONS } from "../decide";
+import { DEFAULT_MODEL } from "../defaults";
 import { LIMITS } from "../limits";
 import { MemoryConductorStore } from "../memory-store";
 
@@ -105,6 +106,8 @@ describe("advanceRun: happy path", () => {
 
     expect(t.dispatched.map((d) => d.step)).toEqual(["spec", "design", "build_test", "verify", "deploy", "post_deploy_check"]);
     expect(t.dispatched.every((d) => d.branch === `cast/${id.slice(0, 8)}`)).toBe(true);
+    // The model in every dispatch comes from the one place it is set.
+    expect(new Set(t.dispatched.map((d) => d.model))).toEqual(new Set([DEFAULT_MODEL]));
     expect(t.store.events.filter((e) => e.kind === "conductor.escalated")).toHaveLength(0);
   });
 
