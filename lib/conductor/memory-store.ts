@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { isTerminal, type GateKind, type RunState } from "@/lib/state-machine";
 import type { StepName } from "@/lib/step-runner/types";
-import type { ConductorStore, InsertResult } from "./store";
+import { STEP_TIMED_OUT_EVENT, type ConductorStore, type InsertResult } from "./store";
 import type { GateDecision, GateStatus, RunSnapshot, StepSnapshot } from "./types";
 
 /**
@@ -52,6 +52,11 @@ export class MemoryConductorStore implements ConductorStore {
     this.clock += 1000;
     return new Date(this.clock).toISOString();
   };
+
+  /** Moves the clock forward, e.g. past a step's deadline. */
+  advanceClock(seconds: number): void {
+    this.clock += seconds * 1000;
+  }
 
   addRun(input: { prompt?: string; registryId?: string | null; maxTestRetries?: number; state?: RunState } = {}): string {
     const id = randomUUID();
@@ -106,6 +111,9 @@ export class MemoryConductorStore implements ConductorStore {
           latestDecision: g.decisions.at(-1) ?? null,
         })),
       totalCostUsd: steps.reduce((sum, s) => sum + (s.costUsd ?? 0), 0),
+      timedOutStepKeys: this.events
+        .filter((e) => e.runId === runId && e.kind === STEP_TIMED_OUT_EVENT)
+        .map((e) => String(e.payload.step_key)),
     };
   }
 
@@ -140,10 +148,12 @@ export class MemoryConductorStore implements ConductorStore {
     return "inserted";
   }
 
-  async markStepFailed(stepKey: string): Promise<void> {
+  async markStepFailed(stepKey: string): Promise<boolean> {
     await yieldOnce();
     const step = this.steps.find((s) => s.stepKey === stepKey && s.status === "dispatched");
-    if (step) step.status = "failed";
+    if (!step) return false;
+    step.status = "failed";
+    return true;
   }
 
   async openGate(runId: string, kind: GateKind, sha: string): Promise<InsertResult> {

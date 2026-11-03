@@ -17,4 +17,9 @@ export const LIMITS = {
   maxTurns: 30,
   /** Agent wall-clock cap for every step. */
   stepTimeoutSeconds: 1800,
+  /**
+   * Extra wait after stepTimeoutSeconds before a step that never reported back
+   * (runner crashed, workflow cancelled, webhook lost) is marked failed.
+   */
+  stepTimeoutGraceSeconds: 300,
 } as const;

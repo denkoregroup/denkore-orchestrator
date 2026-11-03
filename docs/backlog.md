@@ -111,17 +111,6 @@ the env vars, walk through:
 10. As service role, try to insert into `approvals` and update `gates.status`:
     both are refused.
 
-## Detect a step that never completes
-
-**Why:** A dispatched step waits forever if the runner dies or its completion
-webhook is lost. The tick route re-checks the run, but `decide()` just keeps
-waiting on a `dispatched` step.
-
-**Suggested fix:** In `decide()`, treat a step that has been `dispatched` for
-longer than `LIMITS.stepTimeoutSeconds` plus a margin as failed (or escalate
-with "The step didn't finish in time"). Log a `conductor.step_timed_out`
-event so the owner can see what happened.
-
 ## Call the tick route on a schedule
 
 **Why:** `POST /api/conductor/tick` exists but nothing calls it, so a run
@@ -154,3 +143,28 @@ installation token per dispatch, and send the request the stub builds.
 Agree the agent workflow file name (`RUNNER_WORKFLOW` is a placeholder) and
 review the tool allowlists in `lib/conductor/contract.ts` first; they are
 placeholders too.
+
+## Stop late completions from rewriting a timed-out step
+
+**Why:** When a step times out, the Conductor marks it failed and logs
+`conductor.step_timed_out`. If the lost webhook arrives later,
+`record_step_completion` still overwrites that steps row (status, cost,
+output). The run is safe: `decide()` treats any step with a timeout event as
+failed, so a retry that is already running isn't disturbed. But the row then
+says "succeeded" for an attempt that counted as a failure.
+
+**Suggested fix:** A new additive SQL file that makes
+`record_step_completion` keep `status = 'failed'` when a
+`conductor.step_timed_out` event exists for that step key (still recording
+the completion event and the cost). This needs new SQL, so it waits for a
+decision.
+
+## Show timed-out steps as timed out on the run page
+
+**Why:** The run page shows a timed-out step as "Failed", or as "Finished"
+if a late completion rewrote it. The history does say it timed out, but the
+step list doesn't.
+
+**Suggested fix:** Read the run's `conductor.step_timed_out` events in
+`getRun` and label those steps "Didn't report back in time".
+

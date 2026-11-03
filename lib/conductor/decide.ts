@@ -39,7 +39,12 @@ export const REASONS = {
   noChange: (step: StepName) =>
     `The ${STEP_NOUN[step]} was sent back for changes, but no change was produced.`,
   noReviewCommit: "There is no commit for this review.",
+  timedOut: (step: StepName) =>
+    `The ${STEP_NOUN[step]} step didn't report back within ${Math.round(STEP_DEADLINE_SECONDS / 60)} minutes.`,
 } as const;
+
+/** How long a dispatched step may go without reporting back before it is failed. */
+export const STEP_DEADLINE_SECONDS = LIMITS.stepTimeoutSeconds + LIMITS.stepTimeoutGraceSeconds;
 
 /** Timestamps arrive in different ISO shapes (Z or +00:00, ms or µs); compare instants. */
 const at = (iso: string) => Date.parse(iso);
@@ -102,12 +107,12 @@ function onSucceeded(snapshot: RunSnapshot, step: WorkState, done: StepSnapshot)
   }
 }
 
-function onFailed(step: WorkState): ConductorAction {
+function onFailed(step: WorkState, timedOut: boolean): ConductorAction {
   switch (step) {
     case "spec":
     case "design":
     case "deploy":
-      return { type: "escalate", reason: REASONS.stepFailed(step) };
+      return { type: "escalate", reason: timedOut ? REASONS.timedOut(step) : REASONS.stepFailed(step) };
     case "build_test":
       return { type: "transition", event: { type: "tests_failed" } };
     case "verify":
@@ -117,12 +122,19 @@ function onFailed(step: WorkState): ConductorAction {
   }
 }
 
-function decideWork(snapshot: RunSnapshot, step: WorkState): ConductorAction {
+function decideWork(snapshot: RunSnapshot, step: WorkState, now: string): ConductorAction {
   // Only a step dispatched since the run entered this state counts; older ones belong to an earlier visit.
   const current = newest(snapshot.steps, (s) => s.step === step && at(s.dispatchedAt) >= at(snapshot.stateEnteredAt));
   if (!current) return dispatchOrEscalate(snapshot, step);
-  if (current.status === "dispatched") return { type: "wait", reason: `Waiting for the ${STEP_NOUN[step]} step.` };
-  return current.status === "succeeded" ? onSucceeded(snapshot, step, current) : onFailed(step);
+  if (current.status === "dispatched") {
+    if (at(now) - at(current.dispatchedAt) > STEP_DEADLINE_SECONDS * 1000) {
+      return { type: "fail_step", stepKey: current.stepKey, reason: "timed_out" };
+    }
+    return { type: "wait", reason: `Waiting for the ${STEP_NOUN[step]} step.` };
+  }
+  return current.status === "succeeded"
+    ? onSucceeded(snapshot, step, current)
+    : onFailed(step, snapshot.timedOutStepKeys.includes(current.stepKey));
 }
 
 function decideGate(snapshot: RunSnapshot, state: GateState): ConductorAction {
@@ -154,15 +166,24 @@ function decideGate(snapshot: RunSnapshot, state: GateState): ConductorAction {
   }
 }
 
-/** Pure: one run snapshot in, the single next action out. */
-export function decide(snapshot: RunSnapshot): ConductorAction {
+/**
+ * Pure: one run snapshot and the current time in, the single next action out.
+ * `now` is passed in (never read from the clock here) so tests can pin it.
+ */
+export function decide(input: RunSnapshot, now: string): ConductorAction {
+  // A timed-out step stays failed even if a late completion rewrote its row:
+  // a retry may already be running, and the late result must not move the run.
+  const timedOut = new Set(input.timedOutStepKeys);
+  const snapshot: RunSnapshot = timedOut.size
+    ? { ...input, steps: input.steps.map((s) => (timedOut.has(s.stepKey) ? { ...s, status: "failed" as const } : s)) }
+    : input;
   const { state } = snapshot;
   if (isTerminal(state)) return { type: "wait", reason: "The run is finished." };
   if (snapshot.totalCostUsd > LIMITS.maxCostUsd) return { type: "escalate", reason: REASONS.tooExpensive };
   if (snapshot.steps.length > LIMITS.maxStepsPerRun) return { type: "escalate", reason: REASONS.tooManySteps };
 
   if (state === "queued") return { type: "transition", event: { type: "start" } };
-  if (isWorkState(state)) return decideWork(snapshot, state);
+  if (isWorkState(state)) return decideWork(snapshot, state, now);
   if (isGateState(state)) return decideGate(snapshot, state);
   return { type: "wait", reason: `Nothing to do in ${state}.` };
 }

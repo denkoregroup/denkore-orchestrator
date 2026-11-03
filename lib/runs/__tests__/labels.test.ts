@@ -22,6 +22,7 @@ describe("run state labels", () => {
 describe("eventKindLabel", () => {
   it("labels known kinds and passes unknown kinds through", () => {
     expect(eventKindLabel("run.created")).toBe("Run created");
+    expect(eventKindLabel("conductor.step_timed_out")).toBe("A step didn’t report back in time and was stopped");
     expect(eventKindLabel("something.new")).toBe("something.new");
   });
 });
