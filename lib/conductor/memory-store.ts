@@ -180,7 +180,7 @@ export class MemoryConductorStore implements ConductorStore {
     await yieldOnce();
     return [...this.runs.values()]
       .filter((r) => !isTerminal(r.state))
-      .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+      .sort((a, b) => Date.parse(a.updatedAt) - Date.parse(b.updatedAt) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
       .slice(0, limit)
       .map((r) => r.id);
   }

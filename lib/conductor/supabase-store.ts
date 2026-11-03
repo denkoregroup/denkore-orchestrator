@@ -228,7 +228,9 @@ export class SupabaseConductorStore implements ConductorStore {
       .from("runs")
       .select("id")
       .not("state", "in", `(${TERMINAL_STATES.join(",")})`)
-      .order("created_at", { ascending: true })
+      // Longest-waiting first: updated_at moves on every state change. id breaks ties.
+      .order("updated_at", { ascending: true })
+      .order("id", { ascending: true })
       .limit(limit);
     if (error) fail("list active runs", error);
     return z.array(z.object({ id: z.uuid() })).parse(data ?? []).map((r) => r.id);

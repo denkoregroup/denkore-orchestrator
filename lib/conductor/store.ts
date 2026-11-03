@@ -46,6 +46,6 @@ export interface ConductorStore {
 
   logEvent(runId: string, kind: string, payload: Record<string, unknown>): Promise<void>;
 
-  /** Non-terminal runs, oldest first. */
+  /** Non-terminal runs, longest-waiting first (updated_at ascending, then id). */
   listActiveRunIds(limit: number): Promise<string[]>;
 }

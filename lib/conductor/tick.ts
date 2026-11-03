@@ -15,7 +15,7 @@ function json(body: unknown, status: number) {
 
 /**
  * The safety net for runs that stall: advances up to LIMITS.tickBatchSize
- * non-terminal runs, oldest first. The body is ignored but must be signed.
+ * non-terminal runs, the longest-waiting (least recently changed) first. The body is ignored but must be signed.
  * A replayed tick is harmless: advancing a run that has nothing to do is a no-op.
  */
 export function createTickHandler(deps: TickDeps) {
