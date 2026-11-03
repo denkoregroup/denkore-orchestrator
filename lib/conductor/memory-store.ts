@@ -75,7 +75,18 @@ export class MemoryConductorStore implements ConductorStore {
     await yieldOnce();
     const run = this.runs.get(runId);
     if (!run) return null;
-    const steps = this.steps.filter((s) => s.runId === runId).map(({ runId: _r, ...s }) => ({ ...s }));
+    const steps: StepSnapshot[] = this.steps
+      .filter((s) => s.runId === runId)
+      .map((s) => ({
+        step: s.step,
+        attempt: s.attempt,
+        stepKey: s.stepKey,
+        status: s.status,
+        commitSha: s.commitSha,
+        prUrl: s.prUrl,
+        costUsd: s.costUsd,
+        dispatchedAt: s.dispatchedAt,
+      }));
     return {
       runId,
       state: run.state,
