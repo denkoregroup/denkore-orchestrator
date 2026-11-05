@@ -3,6 +3,7 @@
  */
 import path from "node:path";
 import { advanceRun, type ConductorDeps } from "@/lib/conductor/advance";
+import { STEP_DEADLINE_SECONDS } from "@/lib/conductor/decide";
 import { LIMITS } from "@/lib/conductor/limits";
 import { MemoryConductorStore } from "@/lib/conductor/memory-store";
 import { createTickHandler } from "@/lib/conductor/tick";
@@ -36,7 +37,7 @@ async function memoryTick() {
       return advanceRun(runId, deps);
     },
   });
-  return { store, handler, advanced };
+  return { store, deps, handler, advanced };
 }
 
 describe("POST /api/conductor/tick (handler)", () => {
@@ -69,6 +70,8 @@ describe("POST /api/conductor/tick (handler)", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.checked).toBe(2);
+    // The queued run started; the spec run dispatched its step. Nothing had hung.
+    expect(body).toMatchObject({ advanced: 2, stepsTimedOut: 0 });
     expect(t.advanced).toEqual([queued, waiting]);
     expect(t.store.runs.get(queued)!.state).toBe("spec");
     for (const id of [done, escalated, cancelled, failed]) {
@@ -108,6 +111,20 @@ describe("POST /api/conductor/tick (handler)", () => {
     for (let i = 0; i < LIMITS.tickBatchSize + 5; i++) t.store.addRun();
     const body = await (await t.handler(request("{}", sign("{}", SECRET)))).json();
     expect(body.checked).toBe(LIMITS.tickBatchSize);
+  });
+
+  it("reports how many runs moved and how many hung steps it timed out", async () => {
+    const t = await memoryTick();
+    const hung = t.store.addRun({ state: "build_test" });
+    await advanceRun(hung, t.deps); // dispatches a build step that will never report back
+    t.store.advanceClock(STEP_DEADLINE_SECONDS + 1);
+    const fresh = t.store.addRun({ state: "build_test" });
+    await advanceRun(fresh, t.deps); // dispatched just now: inside its deadline
+
+    const body = await (await t.handler(request("{}", sign("{}", SECRET)))).json();
+    // hung: timed out and retried (advanced); fresh: nothing to do yet.
+    expect(body).toMatchObject({ checked: 2, advanced: 1, stepsTimedOut: 1 });
+    expect(t.store.latestStep(hung)).toMatchObject({ attempt: 2, status: "dispatched" });
   });
 
   it("keeps going when one run fails", async () => {

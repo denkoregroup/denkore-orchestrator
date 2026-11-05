@@ -28,15 +28,21 @@ export function createTickHandler(deps: TickDeps) {
 
     const runIds = await deps.listActiveRunIds(LIMITS.tickBatchSize);
     const runs: Array<{ runId: string; stopped: AdvanceResult["stopped"] | "error" }> = [];
+    let advanced = 0;
+    let stepsTimedOut = 0;
     // One at a time: runs are independent, and this keeps load on the database predictable.
     for (const runId of runIds) {
       try {
-        runs.push({ runId, stopped: (await deps.advance(runId)).stopped });
+        const result = await deps.advance(runId);
+        runs.push({ runId, stopped: result.stopped });
+        if (result.applied.length > 0) advanced++;
+        stepsTimedOut += result.applied.filter((a) => a.type === "fail_step").length;
       } catch (e) {
         console.error(`conductor tick: run ${runId} failed`, e);
         runs.push({ runId, stopped: "error" });
       }
     }
-    return json({ checked: runs.length, runs }, 200);
+    // checked: runs looked at; advanced: runs that changed; stepsTimedOut: hung steps failed this tick.
+    return json({ checked: runs.length, advanced, stepsTimedOut, runs }, 200);
   };
 }
