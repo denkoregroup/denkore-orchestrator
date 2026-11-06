@@ -168,3 +168,76 @@ failed runs in a row (read through the Actions API with `actions: read`),
 opens or updates one GitHub issue, or sends a message to the owner's
 notification channel. Close the issue on the next green run.
 
+## Audits: store reports and diff runs
+
+**Why:** `pnpm audit:run` writes a JSON file and forgets it. Nothing keeps
+history, so there is no "new since last week" or "fixed".
+
+**Suggested fix:** An `audit_runs` table (report JSON, target, project) and
+an `audit_findings` table keyed by finding `id`, written with the secret key
+from a script or route. New, still-open and fixed are then set operations on
+ids between two runs.
+
+## Audits: run on a schedule
+
+**Why:** Audits only run when someone types the command.
+
+**Suggested fix:** A weekly job per registry entry with an `audits` block
+(Vercel Cron or a scheduled GitHub workflow) that runs the audit and stores
+the report. Add the schedule to the registry block when this lands.
+
+## Audits: an owner-facing view
+
+**Why:** The findings are only in a terminal and a JSON file.
+
+**Suggested fix:** An `/audits` page listing each project's latest run,
+grouped by severity, with "new since last run" from the stored diff. The
+messages are already written for the owner.
+
+## Audits: model triage
+
+**Why:** Deterministic checks can't say which findings matter most for a
+given business, or write the fix in the site's own terms.
+
+**Suggested fix:** A step that reads stored findings (never the raw site) and
+proposes a short, prioritized fix list for the owner to approve, through the
+existing approval gates.
+
+## Audits: Lighthouse and axe
+
+**Why:** Slice 1 checks markup and headers only. It doesn't measure real page
+speed (layout shift, largest paint) or full accessibility (contrast, focus
+order, ARIA).
+
+**Suggested fix:** Run Lighthouse and axe-core in a headless browser on the
+crawled pages, map their results into the same finding format with stable
+ids, and keep them as separate checks so their findings diff cleanly.
+
+## Audits: slice 1 limits
+
+**Why:** Known gaps, kept out of slice 1 on purpose:
+
+- **Links beyond the page cap** are never fetched, so a broken link on a
+  page that wasn't crawled, or to a page past the cap, isn't reported.
+- **Sitemap parsing** checks the root element and reads `<loc>` values; it
+  is not a full XML parser, so some malformed files pass.
+- **Behind a proxy** (`HTTPS_PROXY`), the proxy resolves hostnames, so the
+  private-address check covers literal IPs, local names and whatever local
+  DNS can resolve. Without a proxy the check runs on the address actually
+  connected to.
+- **No local targets from the CLI.** `allowLocal` is test-only; auditing a
+  `localhost` dev server needs an explicit flag.
+- **robots.txt** `Crawl-delay` is ignored (the auditor already waits 250 ms
+  between requests). Pages are decoded as UTF-8.
+- **The http:// probe** assumes port 80. Tests pass their own probe URL.
+- **A 403 reads as "missing".** robots.txt and the sitemap are reported as
+  absent for any non-200. On dclarkdev.com both are a 403 from the storage
+  bucket (S3 "AccessDenied"), which is true in effect but not in wording.
+  The message could say "can't be read (403)" instead.
+- **Homepage findings use the address you typed.** When the start URL
+  redirects (ggrmusic.com to www), page findings for the homepage carry the
+  apex URL, not the final one.
+
+**Suggested fix:** Take these one at a time as real runs show which matter.
+A HEAD request for every discovered internal link (within a second cap)
+would close the first gap cheaply.
