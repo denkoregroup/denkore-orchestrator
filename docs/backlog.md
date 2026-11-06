@@ -230,6 +230,13 @@ ids, and keep them as separate checks so their findings diff cleanly.
 - **robots.txt** `Crawl-delay` is ignored (the auditor already waits 250 ms
   between requests). Pages are decoded as UTF-8.
 - **The http:// probe** assumes port 80. Tests pass their own probe URL.
+- **A 403 reads as "missing".** robots.txt and the sitemap are reported as
+  absent for any non-200. On dclarkdev.com both are a 403 from the storage
+  bucket (S3 "AccessDenied"), which is true in effect but not in wording.
+  The message could say "can't be read (403)" instead.
+- **Homepage findings use the address you typed.** When the start URL
+  redirects (ggrmusic.com to www), page findings for the homepage carry the
+  apex URL, not the final one.
 
 **Suggested fix:** Take these one at a time as real runs show which matter.
 A HEAD request for every discovered internal link (within a second cap)
