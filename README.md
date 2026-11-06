@@ -124,7 +124,9 @@ never apply the same move twice. The Conductor writes with the secret key
 stall, and what notices timed-out steps: it advances up to 25 unfinished
 runs, the longest-waiting first (least recently changed). It is signed like
 the webhook (HMAC-SHA256 of the raw body with `STEP_WEBHOOK_SECRET`, in
-`x-denkore-signature: sha256=<hex>`). Nothing calls it on a schedule yet.
+`x-denkore-signature: sha256=<hex>`). It answers with
+`{ checked, advanced, stepsTimedOut, runs }`. A GitHub Actions workflow calls
+it every 5 minutes; see [Scheduling the tick](#scheduling-the-tick).
 
 **Simulator.** With `pnpm dev` running and `STEP_WEBHOOK_SECRET` in
 `.env.local`, fake the step a run is waiting on:
@@ -139,6 +141,27 @@ pnpm conductor:simulate --url http://localhost:3000 --run <run id> --step build_
 `--attempt <n>` to complete a retry (the run page shows the try number).
 It refuses any URL that is not localhost unless you add `--allow-remote`,
 and prints what it sent, never the secret.
+
+## Scheduling the tick
+
+`.github/workflows/conductor-tick.yml` runs `scripts/post-tick.mjs` every 5
+minutes (and on demand from the Actions tab). The script posts one signed tick
+to the app, retries once on a network error or a server error, and prints the
+response, never the secret.
+
+Two one-time steps, in the repository's **Settings > Secrets and variables >
+Actions**:
+
+1. Under **Secrets**, add `STEP_WEBHOOK_SECRET` with the same value the app
+   uses (the one in Vercel's environment variables).
+2. Under **Variables**, add `CONDUCTOR_TICK_URL`: the app's tick address, e.g.
+   `https://<production-domain>/api/conductor/tick`.
+
+**When it starts.** GitHub only runs scheduled workflows from the default
+branch, so this starts once the stack (the Conductor and this change) is
+merged to `main`. GitHub can also delay scheduled runs, sometimes by many
+minutes, or skip them when it is busy, so treat every 5 minutes as "usually".
+To try it by hand: `TICK_URL=... STEP_WEBHOOK_SECRET=... node scripts/post-tick.mjs`.
 
 ## Test
 

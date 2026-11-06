@@ -1,0 +1,35 @@
+name: Conductor tick
+
+# Posts one signed tick to the Conductor every 5 minutes, so runs that missed
+# their trigger and steps that never reported back are picked up.
+# Scheduled workflows only run from the default branch. GitHub can delay or
+# skip scheduled runs when it is busy.
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+# Nothing by default. The one job below gets only what checkout needs.
+permissions: {}
+
+concurrency:
+  group: conductor-tick
+  cancel-in-progress: false
+
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      # The repository is private: checkout needs read access, nothing more.
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Post a signed tick
+        run: node scripts/post-tick.mjs
+        env:
+          TICK_URL: ${{ vars.CONDUCTOR_TICK_URL }}
+          STEP_WEBHOOK_SECRET: ${{ secrets.STEP_WEBHOOK_SECRET }}

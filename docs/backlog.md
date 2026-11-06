@@ -111,17 +111,6 @@ the env vars, walk through:
 10. As service role, try to insert into `approvals` and update `gates.status`:
     both are refused.
 
-## Call the tick route on a schedule
-
-**Why:** `POST /api/conductor/tick` exists but nothing calls it, so a run
-that misses its trigger (a failed `after()`, a lost webhook) stalls until the
-next decision or completion.
-
-**Suggested fix:** Either a Vercel Cron job (it would need the HMAC signature,
-so a small signed-request helper or a separate cron secret check) or a
-scheduled GitHub workflow that signs `{}` with `STEP_WEBHOOK_SECRET` and posts
-it every few minutes.
-
 ## Reopen a changes-requested gate at the same SHA
 
 **Why:** If the owner asks for changes and the redo produces the same commit,
@@ -167,4 +156,15 @@ step list doesn't.
 
 **Suggested fix:** Read the run's `conductor.step_timed_out` events in
 `getRun` and label those steps "Didn't report back in time".
+
+## Alert when the tick keeps failing
+
+**Why:** If the tick workflow fails over and over (wrong secret, app down,
+wrong `CONDUCTOR_TICK_URL`), stalled runs and hung steps are never picked up,
+and the only sign is red runs in the Actions tab that nobody is watching.
+
+**Suggested fix:** A small follow-up job in the workflow that, after three
+failed runs in a row (read through the Actions API with `actions: read`),
+opens or updates one GitHub issue, or sends a message to the owner's
+notification channel. Close the issue on the next green run.
 
