@@ -2,10 +2,10 @@ import type { RegistryEntry } from "@/lib/registry/schema";
 import { transition, type RunContext, type RunEvent } from "@/lib/state-machine";
 import { stepKeyFor, type StepRunner } from "@/lib/step-runner/types";
 import { buildStepInput } from "./contract";
-import { decide } from "./decide";
+import { decide, STEP_DEADLINE_SECONDS } from "./decide";
 import { defaultConductorDeps } from "./defaults";
 import { LIMITS } from "./limits";
-import type { ConductorStore } from "./store";
+import { STEP_TIMED_OUT_EVENT, type ConductorStore } from "./store";
 import type { ConductorAction, RunSnapshot } from "./types";
 
 export interface ConductorDeps {
@@ -38,6 +38,9 @@ export const ESCALATION_REASONS = {
   testsKeptFailing: (retries: number) =>
     `Tests kept failing after ${retries} ${retries === 1 ? "retry" : "retries"}.`,
   liveCheckFailed: "The live site check failed.",
+  keptTimingOut: (retries: number) =>
+    `Steps kept not reporting back in time after ${retries} ${retries === 1 ? "retry" : "retries"}. The runner may be down.`,
+  liveCheckTimedOut: "The live site check didn't report back in time.",
 } as const;
 
 function contextOf(snapshot: RunSnapshot): RunContext {
@@ -55,8 +58,11 @@ function contextOf(snapshot: RunSnapshot): RunContext {
 
 /** Why the state machine escalated on its own (retry cap, failed live check). */
 function reducerEscalationReason(event: RunEvent, snapshot: RunSnapshot): string {
-  if (event.type === "check_failed") return ESCALATION_REASONS.liveCheckFailed;
-  return ESCALATION_REASONS.testsKeptFailing(snapshot.maxTestRetries);
+  // The newest step is the one whose failure triggered this; say so if it timed out.
+  const latest = snapshot.steps.at(-1);
+  const timedOut = latest !== undefined && snapshot.timedOutStepKeys.includes(latest.stepKey);
+  if (event.type === "check_failed") return timedOut ? ESCALATION_REASONS.liveCheckTimedOut : ESCALATION_REASONS.liveCheckFailed;
+  return timedOut ? ESCALATION_REASONS.keptTimingOut(snapshot.maxTestRetries) : ESCALATION_REASONS.testsKeptFailing(snapshot.maxTestRetries);
 }
 
 /**
@@ -85,7 +91,7 @@ export async function advanceRun(runId: string, deps: ConductorDeps = defaultCon
   for (let loop = 0; loop < LIMITS.maxAdvanceLoops; loop++) {
     const snapshot = await store.loadSnapshot(runId);
     if (!snapshot) return stop("not_found");
-    const action = decide(snapshot);
+    const action = decide(snapshot, deps.now());
 
     switch (action.type) {
       case "wait":
@@ -168,6 +174,23 @@ export async function advanceRun(runId: string, deps: ConductorDeps = defaultCon
         if (!(await store.moveGate(action.gateId, action.fromSha, action.sha))) return stop("raced");
         applied.push(action);
         break;
+
+      case "fail_step": {
+        // Compare-and-set on the step: only a step still marked dispatched can be failed.
+        // If it completed meanwhile, or another caller failed it first, stop quietly.
+        if (!(await store.markStepFailed(action.stepKey))) return stop("raced");
+        const step = snapshot.steps.find((s) => s.stepKey === action.stepKey);
+        await store.logEvent(runId, STEP_TIMED_OUT_EVENT, {
+          step_key: action.stepKey,
+          step: step?.step ?? null,
+          attempt: step?.attempt ?? null,
+          reason: action.reason,
+          after_seconds: STEP_DEADLINE_SECONDS,
+        });
+        applied.push(action);
+        // The next loop sees a failed step and the usual failure handling runs.
+        break;
+      }
     }
   }
   return stop("loop_limit");

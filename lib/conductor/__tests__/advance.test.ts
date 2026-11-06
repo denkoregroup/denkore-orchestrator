@@ -8,7 +8,8 @@ import type { GateKind } from "@/lib/state-machine";
 import { GitHubActionsRunner } from "@/lib/step-runner/github-actions";
 import type { StepInput } from "@/lib/step-runner/types";
 import { advanceRun, ESCALATION_REASONS, type ConductorDeps } from "../advance";
-import { REASONS } from "../decide";
+import { REASONS, STEP_DEADLINE_SECONDS } from "../decide";
+import { DEFAULT_MODEL } from "../defaults";
 import { LIMITS } from "../limits";
 import { MemoryConductorStore } from "../memory-store";
 
@@ -105,6 +106,8 @@ describe("advanceRun: happy path", () => {
 
     expect(t.dispatched.map((d) => d.step)).toEqual(["spec", "design", "build_test", "verify", "deploy", "post_deploy_check"]);
     expect(t.dispatched.every((d) => d.branch === `cast/${id.slice(0, 8)}`)).toBe(true);
+    // The model in every dispatch comes from the one place it is set.
+    expect(new Set(t.dispatched.map((d) => d.model))).toEqual(new Set([DEFAULT_MODEL]));
     expect(t.store.events.filter((e) => e.kind === "conductor.escalated")).toHaveLength(0);
   });
 
@@ -341,5 +344,143 @@ describe("advanceRun: concurrency", () => {
     await Promise.all([t.advance(id), t.advance(id)]);
     expect(t.store.gates.filter((g) => g.runId === id)).toHaveLength(1);
     expect(t.state(id)).toBe("spec_gate");
+  });
+});
+
+describe("advanceRun: steps that never report back", () => {
+  const PAST_DEADLINE = STEP_DEADLINE_SECONDS + 1;
+
+  async function atBuild(t: ReturnType<typeof setup>, maxTestRetries = 3) {
+    const id = t.store.addRun({ maxTestRetries });
+    await t.advance(id);
+    await t.complete(id);
+    await t.ownerDecides(id, "spec", "approve");
+    await t.complete(id);
+    await t.ownerDecides(id, "design", "approve");
+    expect(t.store.latestStep(id)).toMatchObject({ step: "build_test", attempt: 1, status: "dispatched" });
+    return id;
+  }
+
+  it("waits while the step is inside its deadline", async () => {
+    const t = setup();
+    const id = await atBuild(t);
+    t.store.advanceClock(STEP_DEADLINE_SECONDS - 60);
+    expect((await t.advance(id)).stopped).toBe("waiting");
+    expect(t.store.latestStep(id)).toMatchObject({ attempt: 1, status: "dispatched" });
+  });
+
+  it("fails the hung step, logs why, and retries it within the retry cap", async () => {
+    const t = setup();
+    const id = await atBuild(t);
+    const hung = t.store.latestStep(id).stepKey;
+    t.store.advanceClock(PAST_DEADLINE);
+    const result = await t.advance(id);
+
+    expect(result.applied[0]).toEqual({ type: "fail_step", stepKey: hung, reason: "timed_out" });
+    expect(t.store.steps.find((s) => s.stepKey === hung)!.status).toBe("failed");
+    expect(t.store.events.find((e) => e.kind === "conductor.step_timed_out")?.payload).toMatchObject({
+      step_key: hung,
+      step: "build_test",
+      attempt: 1,
+      reason: "timed_out",
+    });
+    expect(t.store.runs.get(id)).toMatchObject({ state: "build_test", testFailures: 1 });
+    expect(t.store.latestStep(id)).toMatchObject({ step: "build_test", attempt: 2, status: "dispatched" });
+  });
+
+  it("escalates once a hung runner has used up the retries", async () => {
+    const t = setup();
+    const id = await atBuild(t, 2);
+    let result = await t.advance(id);
+    for (let i = 0; i < 10 && result.stopped !== "escalated"; i++) {
+      t.store.advanceClock(PAST_DEADLINE);
+      result = await t.advance(id);
+    }
+    expect(result).toMatchObject({ stopped: "escalated", reason: ESCALATION_REASONS.keptTimingOut(2) });
+    expect(t.store.events.filter((e) => e.kind === "conductor.step_timed_out")).toHaveLength(3);
+  });
+
+  it("counts timed-out attempts toward the step cap, so a hung runner can't loop forever", async () => {
+    const t = setup();
+    const id = await atBuild(t, 100);
+    let result = await t.advance(id);
+    for (let i = 0; i < 50 && result.stopped !== "escalated"; i++) {
+      t.store.advanceClock(PAST_DEADLINE);
+      result = await t.advance(id);
+    }
+    expect(result).toMatchObject({ stopped: "escalated", reason: REASONS.tooManySteps });
+    expect(t.store.steps.filter((s) => s.runId === id)).toHaveLength(LIMITS.maxStepsPerRun);
+  });
+
+  it("escalates a hung plan step straight away, saying it timed out", async () => {
+    const t = setup();
+    const id = t.store.addRun();
+    await t.advance(id);
+    t.store.advanceClock(PAST_DEADLINE);
+    expect(await t.advance(id)).toMatchObject({ stopped: "escalated", reason: REASONS.timedOut("spec") });
+  });
+
+  it("a completion that arrives after the timeout is recorded but does not move the run", async () => {
+    const t = setup();
+    const id = await atBuild(t);
+    const hung = t.store.latestStep(id).stepKey;
+    t.store.advanceClock(PAST_DEADLINE);
+    await t.advance(id); // timed out; attempt 2 is now running
+    const retry = t.store.latestStep(id).stepKey;
+    const before = { ...t.store.runs.get(id)! };
+
+    // The lost webhook finally arrives for attempt 1 (as record_step_completion would store it).
+    expect(t.store.completeStep(hung, { status: "succeeded", commitSha: sha(77), prUrl: "https://example.com/pr/1" })).toBe(true);
+    expect(t.store.events.filter((e) => e.kind === "step.completed" && e.payload.stepKey === hung)).toHaveLength(1);
+    const result = await t.advance(id); // what the webhook's onRecorded trigger does
+
+    expect(result.stopped).toBe("waiting");
+    expect(result.applied).toEqual([]);
+    expect(t.store.runs.get(id)).toEqual(before);
+    expect(t.store.latestStep(id)).toMatchObject({ stepKey: retry, status: "dispatched" });
+  });
+
+  it("a late completion for a timed-out plan step leaves the escalated run alone", async () => {
+    const t = setup();
+    const id = t.store.addRun();
+    await t.advance(id);
+    const hung = t.store.latestStep(id).stepKey;
+    t.store.advanceClock(PAST_DEADLINE);
+    await t.advance(id);
+    t.store.completeStep(hung, { status: "succeeded", commitSha: sha(5) });
+    expect((await t.advance(id)).applied).toEqual([]);
+    expect(t.state(id)).toBe("escalated");
+  });
+
+  it("two concurrent callers past the deadline time the step out once", async () => {
+    const t = setup();
+    const id = await atBuild(t);
+    t.store.advanceClock(PAST_DEADLINE);
+    await Promise.all([t.advance(id), t.advance(id)]);
+    expect(t.store.events.filter((e) => e.kind === "conductor.step_timed_out")).toHaveLength(1);
+    expect(t.store.runs.get(id)!.testFailures).toBe(1);
+    expect(t.store.steps.filter((s) => s.runId === id && s.step === "build_test")).toHaveLength(2);
+  });
+
+  it("does not time out a step that completed just before the deadline check", async () => {
+    const t = setup();
+    const id = await atBuild(t);
+    const step = t.store.latestStep(id);
+    t.store.advanceClock(PAST_DEADLINE);
+    // Completion lands between the snapshot and the timeout write: the step CAS refuses.
+    const stale = await t.store.loadSnapshot(id);
+    t.store.completeStep(step.stepKey, { status: "succeeded", commitSha: sha(9) });
+    let served = false;
+    const staleStore = Object.create(t.store) as MemoryConductorStore;
+    staleStore.loadSnapshot = async (runId: string) => {
+      if (!served) {
+        served = true;
+        return stale;
+      }
+      return t.store.loadSnapshot(runId);
+    };
+    const result = await advanceRun(id, { ...t.deps, store: staleStore });
+    expect(result.stopped).toBe("raced");
+    expect(t.store.events.filter((e) => e.kind === "conductor.step_timed_out")).toHaveLength(0);
   });
 });

@@ -1,13 +1,11 @@
 import type { RegistryEntry } from "@/lib/registry/schema";
 import type { StepInput, StepName } from "@/lib/step-runner/types";
+import { modelFor } from "./defaults";
 import { LIMITS } from "./limits";
 
 /**
  * The shared agent contract: one config for every step, not per-agent tuning.
  */
-
-/** One default model for every step. */
-export const DEFAULT_MODEL = "claude-opus-5-5";
 
 /**
  * PLACEHOLDERS. Review these allowlists before any real runner is connected:
@@ -66,12 +64,9 @@ export function buildStepInput(input: {
       ownerNote: input.ownerNote,
     }),
     toolAllowlist: [...TOOL_ALLOWLISTS[input.step]],
-    model: DEFAULT_MODEL,
+    model: modelFor(input.step),
     maxTurns: LIMITS.maxTurns,
     timeoutSeconds: LIMITS.stepTimeoutSeconds,
     branch: branchFor(input.runId),
   };
 }
-
-/** PLACEHOLDER: the agent workflow the stub runner would dispatch in each project's repo. */
-export const RUNNER_WORKFLOW = "denkore-step.yml";

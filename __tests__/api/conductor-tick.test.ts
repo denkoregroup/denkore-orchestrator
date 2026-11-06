@@ -56,7 +56,7 @@ describe("POST /api/conductor/tick (handler)", () => {
     expect((await handler(request("{}", sign("{}", "")))).status).toBe(500);
   });
 
-  it("advances only non-terminal runs, oldest first", async () => {
+  it("advances only non-terminal runs, longest-waiting first", async () => {
     const t = await memoryTick();
     const queued = t.store.addRun();
     const done = t.store.addRun({ state: "done" });
@@ -74,6 +74,33 @@ describe("POST /api/conductor/tick (handler)", () => {
     for (const id of [done, escalated, cancelled, failed]) {
       expect(t.store.events.filter((e) => e.runId === id)).toHaveLength(0);
     }
+  });
+
+  it("handles the longest-waiting runs first when there are more than the batch size", async () => {
+    const t = await memoryTick();
+    const total = LIMITS.tickBatchSize + 10;
+    const ids = Array.from({ length: total }, () => t.store.addRun());
+    // Waiting order differs from creation order: run i last changed (i * 8) mod total minutes ago.
+    // 8 and 35 share no factor, so every run gets a different age.
+    const minutesAgo = new Map(ids.map((id, i) => [id, (i * 8) % total]));
+    expect(new Set(minutesAgo.values()).size).toBe(total);
+    for (const id of ids) {
+      t.store.runs.get(id)!.updatedAt = new Date(Date.parse("2026-10-30T12:00:00.000Z") - minutesAgo.get(id)! * 60_000).toISOString();
+    }
+    t.store.addRun({ state: "done" });
+
+    const body = await (await t.handler(request("{}", sign("{}", SECRET)))).json();
+    const longestWaiting = [...ids].sort((a, b) => minutesAgo.get(b)! - minutesAgo.get(a)!).slice(0, LIMITS.tickBatchSize);
+    expect(body.checked).toBe(LIMITS.tickBatchSize);
+    expect(t.advanced).toEqual(longestWaiting);
+    expect(t.advanced).not.toEqual(ids.slice(0, LIMITS.tickBatchSize));
+  });
+
+  it("breaks updated_at ties by id, so the order is always the same", async () => {
+    const t = await memoryTick();
+    const ids = Array.from({ length: 5 }, () => t.store.addRun());
+    for (const id of ids) t.store.runs.get(id)!.updatedAt = "2026-10-30T12:00:00.000Z";
+    expect(await t.store.listActiveRunIds(5)).toEqual([...ids].sort());
   });
 
   it("stops at the batch size", async () => {

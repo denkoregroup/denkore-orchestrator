@@ -83,9 +83,31 @@ the single next action, applies it, and repeats, at most 10 times:
   back with your note included in the next step's task. If the redo produces
   the same commit, it escalates ("no change was produced").
 - It escalates when a step fails where retrying makes no sense, after too
-  many test failures, more than 20 steps, or more than $15 of cost. These
-  limits are starting values in `lib/conductor/limits.ts`. Escalations show
-  on the run's history with the reason.
+  many test failures, more than 20 steps, or more than $15 of cost.
+  Escalations show on the run's history with the reason.
+- A step that never reports back (runner crashed, workflow cancelled, webhook
+  lost) is marked failed 35 minutes after it was dispatched: the step timeout
+  plus a grace period. Then the usual failure handling runs, so the build
+  retries within the run's retry limit, and a plan step escalates. Each
+  timed-out attempt counts toward the 20-step limit. If the lost completion
+  turns up later it is recorded, but it never moves the run.
+
+**Limits** (`lib/conductor/limits.ts`; starting values, to revisit once real
+runs exist):
+
+| Limit | Value | What happens |
+| --- | --- | --- |
+| `maxStepsPerRun` | 20 | A run that would need more steps escalates. Timed-out attempts count. |
+| `maxCostUsd` | $15 | A run whose reported step costs pass this escalates. |
+| `maxAdvanceLoops` | 10 | `advanceRun` applies at most this many actions per call. |
+| `tickBatchSize` | 25 | The tick advances at most this many runs per call. |
+| `maxTurns` | 30 | Agent turn cap, sent with every step. |
+| `stepTimeoutSeconds` | 1800 (30 min) | Agent wall-clock cap, sent with every step. |
+| `stepTimeoutGraceSeconds` | 300 (5 min) | Extra wait before a step that never reported back is marked failed. |
+
+The model is set in one place, `lib/conductor/defaults.ts`: every step uses
+`DEFAULT_MODEL` (Sonnet), and `MODEL_OVERRIDES` moves a single step to
+another model with one line.
 
 State changes are compare-and-set on the run's state and `updated_at`, and
 step and gate rows are protected by their unique keys, so two callers can
@@ -99,7 +121,8 @@ never apply the same move twice. The Conductor writes with the secret key
 3. the step-complete webhook records a new completion (never for a replay).
 
 **Tick route.** `POST /api/conductor/tick` is the safety net for runs that
-stall: it advances up to 25 unfinished runs, oldest first. It is signed like
+stall, and what notices timed-out steps: it advances up to 25 unfinished
+runs, the longest-waiting first (least recently changed). It is signed like
 the webhook (HMAC-SHA256 of the raw body with `STEP_WEBHOOK_SECRET`, in
 `x-denkore-signature: sha256=<hex>`). Nothing calls it on a schedule yet.
 

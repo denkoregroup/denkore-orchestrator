@@ -16,7 +16,7 @@ import { z } from "zod";
 import { createServiceClient } from "@/lib/supabase/admin";
 import { RUN_STATES, TERMINAL_STATES, type GateKind, type RunState } from "@/lib/state-machine";
 import { STEP_NAMES, type StepName } from "@/lib/step-runner/types";
-import type { ConductorStore, InsertResult } from "./store";
+import { STEP_TIMED_OUT_EVENT, type ConductorStore, type InsertResult } from "./store";
 import type { RunSnapshot } from "./types";
 
 const numeric = z.union([z.number(), z.string().regex(/^-?\d+(\.\d+)?$/).transform(Number)]);
@@ -86,7 +86,7 @@ export class SupabaseConductorStore implements ConductorStore {
     if (!runRes.data) return null;
     const run = runRow.parse(runRes.data);
 
-    const [projectRes, stepsRes, gatesRes] = await Promise.all([
+    const [projectRes, stepsRes, gatesRes, timeoutsRes] = await Promise.all([
       this.db.from("projects").select("registry_id").eq("id", run.project_id).maybeSingle(),
       this.db
         .from("steps")
@@ -94,10 +94,16 @@ export class SupabaseConductorStore implements ConductorStore {
         .eq("run_id", runId)
         .order("dispatched_at"),
       this.db.from("gates").select("id, kind, commit_sha, status").eq("run_id", runId),
+      this.db.from("events").select("payload").eq("run_id", runId).eq("kind", STEP_TIMED_OUT_EVENT),
     ]);
     if (projectRes.error) fail("load project", projectRes.error);
     if (stepsRes.error) fail("load steps", stepsRes.error);
     if (gatesRes.error) fail("load gates", gatesRes.error);
+    if (timeoutsRes.error) fail("load timeouts", timeoutsRes.error);
+    const timedOutStepKeys = z
+      .array(z.object({ payload: z.object({ step_key: z.string() }).loose() }))
+      .parse(timeoutsRes.data ?? [])
+      .map((e) => e.payload.step_key);
     const steps = z.array(stepRow).parse(stepsRes.data ?? []);
     const gates = z.array(gateRow).parse(gatesRes.data ?? []);
 
@@ -149,6 +155,7 @@ export class SupabaseConductorStore implements ConductorStore {
         };
       }),
       totalCostUsd: steps.reduce((sum, s) => sum + (s.cost_usd ?? 0), 0),
+      timedOutStepKeys,
     };
   }
 
@@ -182,13 +189,15 @@ export class SupabaseConductorStore implements ConductorStore {
     return "inserted";
   }
 
-  async markStepFailed(stepKey: string): Promise<void> {
-    const { error } = await this.db
+  async markStepFailed(stepKey: string): Promise<boolean> {
+    const { data, error } = await this.db
       .from("steps")
       .update({ status: "failed" })
       .eq("step_key", stepKey)
-      .eq("status", "dispatched");
+      .eq("status", "dispatched")
+      .select("id");
     if (error) fail("mark step failed", error);
+    return (data?.length ?? 0) === 1;
   }
 
   async openGate(runId: string, kind: GateKind, sha: string): Promise<InsertResult> {
@@ -219,7 +228,9 @@ export class SupabaseConductorStore implements ConductorStore {
       .from("runs")
       .select("id")
       .not("state", "in", `(${TERMINAL_STATES.join(",")})`)
-      .order("created_at", { ascending: true })
+      // Longest-waiting first: updated_at moves on every state change. id breaks ties.
+      .order("updated_at", { ascending: true })
+      .order("id", { ascending: true })
       .limit(limit);
     if (error) fail("list active runs", error);
     return z.array(z.object({ id: z.uuid() })).parse(data ?? []).map((r) => r.id);

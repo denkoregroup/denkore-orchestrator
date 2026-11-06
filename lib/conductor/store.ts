@@ -2,6 +2,9 @@ import type { GateKind, RunState } from "@/lib/state-machine";
 import type { StepName } from "@/lib/step-runner/types";
 import type { RunSnapshot } from "./types";
 
+/** Written when the Conductor fails a step that never reported back. Its payload carries step_key. */
+export const STEP_TIMED_OUT_EVENT = "conductor.step_timed_out";
+
 /** "conflict" means another caller already wrote the same row: stop quietly. */
 export type InsertResult = "inserted" | "conflict";
 
@@ -29,8 +32,11 @@ export interface ConductorStore {
     dispatchedAt: string;
   }): Promise<InsertResult>;
 
-  /** Marks a still-dispatched step failed (the runner never received it). */
-  markStepFailed(stepKey: string): Promise<void>;
+  /**
+   * Compare-and-set: marks the step failed only if it is still dispatched.
+   * Returns false when it already completed or another caller failed it first.
+   */
+  markStepFailed(stepKey: string): Promise<boolean>;
 
   /** Inserts the gate row. Conflict when the run already has a gate of this kind. */
   openGate(runId: string, kind: GateKind, sha: string): Promise<InsertResult>;
@@ -40,6 +46,6 @@ export interface ConductorStore {
 
   logEvent(runId: string, kind: string, payload: Record<string, unknown>): Promise<void>;
 
-  /** Non-terminal runs, oldest first. */
+  /** Non-terminal runs, longest-waiting first (updated_at ascending, then id). */
   listActiveRunIds(limit: number): Promise<string[]>;
 }

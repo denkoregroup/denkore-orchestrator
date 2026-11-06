@@ -48,6 +48,7 @@ const EVENT_KIND_LABELS: Record<string, string> = {
   "conductor.dispatched": "Step sent to the runner",
   "conductor.dispatch_failed": "A step couldn’t be sent",
   "conductor.escalated": "Needs your attention",
+  "conductor.step_timed_out": "A step didn’t report back in time and was stopped",
   "conductor.transition_rejected": "A move was refused",
 };
 

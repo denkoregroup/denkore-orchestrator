@@ -51,6 +51,11 @@ export interface RunSnapshot {
   steps: StepSnapshot[];
   gates: GateSnapshot[];
   totalCostUsd: number;
+  /**
+   * Step keys the Conductor timed out (from conductor.step_timed_out events).
+   * They count as failed even if a late completion later rewrites the row.
+   */
+  timedOutStepKeys: string[];
 }
 
 export type ConductorAction =
@@ -59,4 +64,6 @@ export type ConductorAction =
   | { type: "transition"; event: RunEvent }
   | { type: "open_gate"; kind: GateKind; sha: string }
   | { type: "move_gate"; gateId: string; fromSha: string; sha: string }
-  | { type: "escalate"; reason: string };
+  | { type: "escalate"; reason: string }
+  /** A dispatched step that never reported back: mark it failed, then normal failure handling runs. */
+  | { type: "fail_step"; stepKey: string; reason: "timed_out" };

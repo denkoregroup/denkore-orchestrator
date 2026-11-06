@@ -3,7 +3,7 @@
  */
 import { RUN_STATES, TERMINAL_STATES, type RunState } from "@/lib/state-machine";
 import type { StepName } from "@/lib/step-runner/types";
-import { decide, REASONS } from "../decide";
+import { decide, REASONS, STEP_DEADLINE_SECONDS } from "../decide";
 import { LIMITS } from "../limits";
 import type { ConductorAction, GateSnapshot, RunSnapshot, StepSnapshot } from "../types";
 
@@ -11,6 +11,9 @@ const RUN = "6f1c2b9e-4a3d-4c1e-9b7a-2d5e8f0a1b3c";
 const ENTERED = "2026-10-30T10:00:00.000Z";
 const BEFORE = "2026-10-30T09:00:00.000Z";
 const AFTER = "2026-10-30T10:05:00.000Z";
+/** "Now" for every case: a minute after AFTER, well inside any step deadline. */
+const NOW = "2026-10-30T10:06:00.000Z";
+const plusSeconds = (iso: string, seconds: number) => new Date(Date.parse(iso) + seconds * 1000).toISOString();
 const SHA_A = "a".repeat(40);
 const SHA_B = "b".repeat(40);
 
@@ -44,6 +47,7 @@ function snap(state: RunState, overrides: Partial<RunSnapshot> = {}): RunSnapsho
     steps: [],
     gates: [],
     totalCostUsd: 0,
+    timedOutStepKeys: [],
     ...overrides,
   };
 }
@@ -185,13 +189,13 @@ const cases: Case[] = [
 
 describe("decide", () => {
   it.each(cases)("%s", (_name, snapshot, expected) => {
-    const action = decide(snapshot);
+    const action = decide(snapshot, NOW);
     if (typeof expected === "function") expected(action);
     else expect(action).toEqual(expected);
   });
 
   it.each([...TERMINAL_STATES])("terminal %s waits, even over the caps", (state) => {
-    expect(decide(snap(state, { totalCostUsd: 999 })).type).toBe("wait");
+    expect(decide(snap(state, { totalCostUsd: 999 }), NOW).type).toBe("wait");
   });
 
   it("has a case for every run state", () => {
@@ -203,6 +207,69 @@ describe("decide", () => {
 
   it("treats timestamps in different ISO shapes as the same instant", () => {
     const s = snap("spec", { stateEnteredAt: "2026-10-30T10:00:00.000+00:00", steps: [step("spec", { status: "dispatched", dispatchedAt: "2026-10-30T10:00:00Z" })] });
-    expect(decide(s).type).toBe("wait");
+    expect(decide(s, NOW).type).toBe("wait");
+  });
+});
+
+describe("decide: steps that never report back", () => {
+  const deadline = LIMITS.stepTimeoutSeconds + LIMITS.stepTimeoutGraceSeconds;
+  const dispatched = (name: StepName) => step(name, { status: "dispatched", dispatchedAt: AFTER });
+
+  it("uses a deadline of the step timeout plus the grace period", () => {
+    expect(STEP_DEADLINE_SECONDS).toBe(1800 + 300);
+    expect(LIMITS.stepTimeoutGraceSeconds).toBe(300);
+  });
+
+  it("keeps waiting at exactly the step timeout", () => {
+    expect(decide(snap("build_test", { steps: [dispatched("build_test")] }), plusSeconds(AFTER, LIMITS.stepTimeoutSeconds)).type).toBe("wait");
+  });
+
+  it("keeps waiting at exactly timeout plus grace", () => {
+    expect(decide(snap("build_test", { steps: [dispatched("build_test")] }), plusSeconds(AFTER, deadline)).type).toBe("wait");
+  });
+
+  it.each(["spec", "design", "build_test", "verify", "deploy", "post_deploy_check"] as const)(
+    "fails a %s step one second past timeout plus grace",
+    (name) => {
+      const s = dispatched(name);
+      expect(decide(snap(name, { steps: [s] }), plusSeconds(AFTER, deadline + 1))).toEqual({
+        type: "fail_step",
+        stepKey: s.stepKey,
+        reason: "timed_out",
+      });
+    },
+  );
+
+  it("measures from the step's recorded dispatch time, not when the run entered the state", () => {
+    const late = step("build_test", { status: "dispatched", dispatchedAt: plusSeconds(AFTER, 600) });
+    expect(decide(snap("build_test", { steps: [late] }), plusSeconds(AFTER, deadline + 1)).type).toBe("wait");
+  });
+
+  it("treats a timed-out step as failed even if a late completion marked it succeeded", () => {
+    const s = step("build_test", { status: "succeeded" });
+    expect(decide(snap("build_test", { steps: [s], timedOutStepKeys: [s.stepKey] }), NOW)).toEqual({
+      type: "transition",
+      event: { type: "tests_failed" },
+    });
+  });
+
+  it("escalates a timed-out plan step with a timeout reason", () => {
+    const s = step("spec", { status: "failed" });
+    expect(decide(snap("spec", { steps: [s], timedOutStepKeys: [s.stepKey] }), NOW)).toEqual({
+      type: "escalate",
+      reason: REASONS.timedOut("spec"),
+    });
+  });
+
+  it("does not use a timed-out step as the commit a gate reviews", () => {
+    const s = step("spec", { status: "succeeded" });
+    expect(decide(snap("spec_gate", { steps: [s], timedOutStepKeys: [s.stepKey] }), NOW)).toEqual({
+      type: "escalate",
+      reason: REASONS.noReviewCommit,
+    });
+  });
+
+  it("an unparseable clock never fails a step", () => {
+    expect(decide(snap("build_test", { steps: [dispatched("build_test")] }), "not a time").type).toBe("wait");
   });
 });
