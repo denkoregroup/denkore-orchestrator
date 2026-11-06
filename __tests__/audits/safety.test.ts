@@ -158,6 +158,19 @@ describe("requests", () => {
     expect(proxy.tunnels).toHaveLength(1);
   });
 
+  it("really sends the request through the tunnel: a host only the proxy can resolve still loads", async () => {
+    // "audit-fixture.invalid" does not resolve locally, so a direct connection would fail.
+    const site = await serve({ "/": { body: "only via proxy" } });
+    const proxy = await startConnectProxy({ "audit-fixture.invalid": "127.0.0.1" });
+    servers.push(proxy);
+    const url = `http://audit-fixture.invalid:${site.port}/`;
+
+    const result = await createFetcher({ proxy: proxy.url, noProxy: "", delayMs: 0 }).fetch(url);
+    expect(result).toMatchObject({ status: 200, body: "only via proxy", error: null });
+    expect(proxy.tunnels).toEqual([`audit-fixture.invalid:${site.port}`]);
+    expect(site.hits).toHaveLength(1);
+  });
+
   it("still refuses a private target when a proxy is configured", async () => {
     const proxy = await startConnectProxy();
     servers.push(proxy);

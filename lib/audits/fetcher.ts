@@ -258,6 +258,8 @@ async function requestOnce(url: URL, options: Required<Pick<FetcherOptions, "tim
         url.protocol === "https:"
           ? tls.connect({ socket: tunnel, servername: isIP(host) ? undefined : host, ca: options.ca ? [...tls.rootCertificates, options.ca] : undefined })
           : tunnel;
+      // Until the request takes the socket over, a reset must not crash the process.
+      tunnel.on("error", () => {});
       createConnection = () => socket;
     }
 
@@ -270,11 +272,14 @@ async function requestOnce(url: URL, options: Required<Pick<FetcherOptions, "tim
           accept: "text/html,application/xhtml+xml,application/xml;q=0.9,text/plain;q=0.8,*/*;q=0.5",
           "accept-encoding": "identity",
         },
-        agent: false,
         signal: controller.signal,
+        // Through a proxy: no agent at all, so Node uses the tunnelled socket.
+        // (agent: false would make a fresh agent, which ignores createConnection
+        // and connects directly, bypassing the proxy.)
         ...(createConnection
           ? { createConnection }
           : {
+              agent: false,
               lookup: guardedLookup(allowLocal) as unknown as http.RequestOptions["lookup"],
               ...(options.ca && url.protocol === "https:" ? { ca: [...tls.rootCertificates, options.ca] } : {}),
             }),

@@ -95,7 +95,10 @@ export async function startServer(
 }
 
 /** A minimal HTTP CONNECT proxy, to exercise the fetcher's proxy path. */
-export async function startConnectProxy(): Promise<{ url: string; tunnels: string[]; close(): Promise<void> }> {
+export async function startConnectProxy(
+  /** Hostnames only the proxy can resolve, e.g. { "site.test": "127.0.0.1" }. */
+  hosts: Record<string, string> = {},
+): Promise<{ url: string; tunnels: string[]; close(): Promise<void> }> {
   const tunnels: string[] = [];
   const sockets = new Set<net.Socket>();
   const server = http.createServer((_req, res) => {
@@ -105,7 +108,7 @@ export async function startConnectProxy(): Promise<{ url: string; tunnels: strin
   server.on("connect", (request, client: net.Socket) => {
     tunnels.push(request.url ?? "");
     const [host, port] = (request.url ?? "").split(":");
-    const upstream = net.connect(Number(port), host, () => {
+    const upstream = net.connect(Number(port), hosts[host] ?? host, () => {
       client.write("HTTP/1.1 200 Connection Established\r\n\r\n");
       upstream.pipe(client);
       client.pipe(upstream);
