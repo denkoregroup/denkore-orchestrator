@@ -11,6 +11,9 @@ jest.mock("@/lib/supabase/step-completion-store", () => ({
   SupabaseStepCompletionStore: jest.fn(() => store),
 }));
 
+const scheduleAdvance = jest.fn();
+jest.mock("@/lib/conductor/schedule", () => ({ scheduleAdvance: (id: string) => scheduleAdvance(id) }));
+
 process.env.STEP_WEBHOOK_SECRET = SECRET;
 
 // Import after the env and mock are in place; the route reads the secret at load.
@@ -40,7 +43,10 @@ function request(body: string, signature: string | null) {
   });
 }
 
-beforeEach(() => store.records.clear());
+beforeEach(() => {
+  store.records.clear();
+  scheduleAdvance.mockClear();
+});
 
 describe("verifySignature", () => {
   const body = JSON.stringify(payload);
@@ -76,6 +82,8 @@ describe("POST /api/webhooks/step-complete", () => {
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ status: "recorded", stepKey: payload.stepKey });
     expect(store.records.size).toBe(1);
+    expect(scheduleAdvance).toHaveBeenCalledTimes(1);
+    expect(scheduleAdvance).toHaveBeenCalledWith(payload.runId);
   });
 
   it("rejects a bad signature without recording anything", async () => {
@@ -83,6 +91,7 @@ describe("POST /api/webhooks/step-complete", () => {
     const res = await POST(request(body, sign(body, "wrong")));
     expect(res.status).toBe(401);
     expect(store.records.size).toBe(0);
+    expect(scheduleAdvance).not.toHaveBeenCalled();
   });
 
   it("rejects a missing signature", async () => {
@@ -107,6 +116,8 @@ describe("POST /api/webhooks/step-complete", () => {
     expect(replay.status).toBe(200);
     expect(await replay.json()).toEqual({ status: "duplicate", stepKey: payload.stepKey });
     expect(store.records.size).toBe(1);
+    // Advanced for the first delivery only; the replay changes nothing.
+    expect(scheduleAdvance).toHaveBeenCalledTimes(1);
   });
 
   it("does not let a replay with a changed body overwrite the original", async () => {

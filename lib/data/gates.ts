@@ -76,6 +76,7 @@ export async function listPendingGates(): Promise<PendingGate[]> {
 
 export interface GateForDecision {
   gateId: string;
+  runId: string;
   kind: GateStatusRow["kind"];
   /** Registry id of the run's project, or null if the project row is missing. */
   registryId: string | null;
@@ -111,7 +112,7 @@ export async function getGateForDecision(gateId: string): Promise<GateForDecisio
     ? parseRow(z.object({ registry_id: z.string() }), projectRes.data, "projects").registry_id
     : null;
 
-  return { gateId: gate.id, kind: gate.kind, registryId };
+  return { gateId: gate.id, runId: gate.run_id, kind: gate.kind, registryId };
 }
 
 export interface ApprovalInsert {

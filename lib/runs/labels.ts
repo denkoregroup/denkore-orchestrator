@@ -45,6 +45,10 @@ const EVENT_KIND_LABELS: Record<string, string> = {
   "gate.approve": "Approved",
   "gate.request_changes": "Changes requested",
   "gate.approval_voided": "Approval reset by a new commit",
+  "conductor.dispatched": "Step sent to the runner",
+  "conductor.dispatch_failed": "A step couldn’t be sent",
+  "conductor.escalated": "Needs your attention",
+  "conductor.transition_rejected": "A move was refused",
 };
 
 /** Plain-language label for known event kinds; the raw kind otherwise. */
@@ -60,6 +64,10 @@ export function eventDescription(kind: string, payload: unknown): string {
       return `Now: ${RUN_STATE_LABELS[to as RunState]}`;
     }
   }
+  if (kind === "conductor.escalated" && payload && typeof payload === "object" && "reason" in payload) {
+    const reason = (payload as { reason: unknown }).reason;
+    if (typeof reason === "string" && reason) return `Needs your attention: ${reason}`;
+  }
   return eventKindLabel(kind);
 }
 
@@ -68,6 +76,7 @@ export function actorLabel(actor: string): string {
   if (actor.startsWith("owner:")) return "You";
   if (actor === "system") return "System";
   if (actor === "runner") return "Runner";
+  if (actor === "conductor") return "Conductor";
   return actor;
 }
 

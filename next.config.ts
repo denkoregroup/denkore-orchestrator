@@ -1,10 +1,11 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // /approvals reads registry/*.yaml at runtime (page and decision action);
-  // make sure the files ship with its server bundle.
+  // The approvals page and the Conductor (run from server actions, the
+  // step-complete webhook and the tick route) read registry/*.yaml at
+  // runtime; make sure the files ship with every server bundle.
   outputFileTracingIncludes: {
-    "/approvals": ["./registry/**/*.yaml"],
+    "/**": ["./registry/**/*.yaml"],
   },
   turbopack: {
     rules: {

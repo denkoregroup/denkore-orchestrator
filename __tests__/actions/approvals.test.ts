@@ -10,6 +10,8 @@ const revalidatePath = jest.fn();
 jest.mock("@/lib/auth", () => ({ requireOwner: jest.fn().mockResolvedValue({ id: "owner", email: null }) }));
 jest.mock("@/lib/supabase/server", () => ({ createClient: () => createClient() }));
 jest.mock("next/cache", () => ({ revalidatePath: (p: string) => revalidatePath(p) }));
+const scheduleAdvance = jest.fn();
+jest.mock("@/lib/conductor/schedule", () => ({ scheduleAdvance: (id: string) => scheduleAdvance(id) }));
 
 import { decideGateAction } from "@/app/(app)/approvals/actions";
 import { DECISION_MESSAGES, INITIAL_DECISION_STATE, PR_REVIEW_ATTESTATION } from "@/lib/approvals/decide";
@@ -56,6 +58,7 @@ const approvalInserts = (fake: ReturnType<typeof db>) =>
 beforeEach(() => {
   createClient.mockReset();
   revalidatePath.mockClear();
+  scheduleAdvance.mockClear();
 });
 
 describe("decideGateAction", () => {
@@ -72,6 +75,7 @@ describe("decideGateAction", () => {
       note: null,
     });
     expect(revalidatePath).toHaveBeenCalledWith("/approvals");
+    expect(scheduleAdvance).toHaveBeenCalledWith(IDS.run);
   });
 
   it("never selects the gate's commit SHA on the server", async () => {
@@ -87,6 +91,7 @@ describe("decideGateAction", () => {
     const state = await decideGateAction(INITIAL_DECISION_STATE, form({ decision: "approve" }));
     expect(state).toEqual({ status: "error", gateId: IDS.gate, message: DECISION_MESSAGES.needsReview });
     expect(approvalInserts(fake)).toHaveLength(0);
+    expect(scheduleAdvance).not.toHaveBeenCalled();
   });
 
   it("ignores a crafted form that claims one-tap for a PR-review gate", async () => {
@@ -138,6 +143,7 @@ describe("decideGateAction", () => {
     const state = await decideGateAction(INITIAL_DECISION_STATE, form({ decision: "approve" }));
     expect(state).toEqual({ status: "error", gateId: IDS.gate, message: expected });
     expect(revalidatePath).not.toHaveBeenCalled();
+    expect(scheduleAdvance).not.toHaveBeenCalled();
   });
 
   it("reports a gate that no longer exists as changed", async () => {

@@ -136,6 +136,7 @@ describe("getGateForDecision", () => {
     });
     expect(await getGateForDecision(GATE_ID)).toEqual({
       gateId: GATE_ID,
+      runId: RUN_ID,
       kind: "release",
       registryId: "example-app",
     });

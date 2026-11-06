@@ -32,9 +32,17 @@ describe("eventDescription and actorLabel", () => {
     expect(eventDescription("run.state_changed", { to: "nonsense" })).toBe("Run moved to a new stage");
   });
 
+  it("gives the reason for an escalation", () => {
+    expect(eventDescription("conductor.escalated", { reason: "The plan step failed." })).toBe(
+      "Needs your attention: The plan step failed.",
+    );
+    expect(eventDescription("conductor.escalated", {})).toBe("Needs your attention");
+  });
+
   it("describes actors in words", () => {
     expect(actorLabel("owner:6f1c2b9e-4a3d-4c1e-9b7a-2d5e8f0a1b3c")).toBe("You");
     expect(actorLabel("system")).toBe("System");
+    expect(actorLabel("conductor")).toBe("Conductor");
     expect(actorLabel("custom-bot")).toBe("custom-bot");
   });
 });

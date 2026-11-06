@@ -12,6 +12,8 @@ jest.mock("@/lib/auth", () => ({ requireOwner: jest.fn().mockResolvedValue({ id:
 jest.mock("@/lib/supabase/server", () => ({ createClient: () => createClient() }));
 jest.mock("next/cache", () => ({ revalidatePath: jest.fn() }));
 jest.mock("next/navigation", () => ({ redirect: (url: string) => redirect(url) }));
+const scheduleAdvance = jest.fn();
+jest.mock("@/lib/conductor/schedule", () => ({ scheduleAdvance: (id: string) => scheduleAdvance(id) }));
 
 import { createRunAction } from "@/app/(app)/prompt/actions";
 import { EMPTY_PROMPT_FORM, UNKNOWN_PROJECT_MESSAGE } from "@/lib/runs/prompt-form";
@@ -41,6 +43,7 @@ const insertsInto = (fake: ReturnType<typeof db>) =>
 beforeEach(() => {
   createClient.mockReset();
   redirect.mockClear();
+  scheduleAdvance.mockClear();
 });
 
 describe("createRunAction", () => {
@@ -50,6 +53,7 @@ describe("createRunAction", () => {
     expect(state.errors.prompt).toMatch(/at least 10 characters/);
     expect(state.values.prompt).toBe("  short  ");
     expect(fake.queries).toHaveLength(0);
+    expect(scheduleAdvance).not.toHaveBeenCalled();
   });
 
   it("rejects a prompt over 4000 characters", async () => {
@@ -78,6 +82,7 @@ describe("createRunAction", () => {
     );
     expect(state.errors.projectId).toBe(UNKNOWN_PROJECT_MESSAGE);
     expect(insertsInto(fake)).toHaveLength(0);
+    expect(scheduleAdvance).not.toHaveBeenCalled();
   });
 
   it("rejects a missing project", async () => {
@@ -102,6 +107,8 @@ describe("createRunAction", () => {
       ),
     ).rejects.toThrow(`NEXT_REDIRECT /runs/${NEW_RUN_ID}`);
 
+    expect(scheduleAdvance).toHaveBeenCalledTimes(1);
+    expect(scheduleAdvance).toHaveBeenCalledWith(NEW_RUN_ID);
     const [insert] = insertsInto(fake);
     expect(argsOf(insert, "insert")?.[0]).toEqual({
       project_id: PROJECT_ID,

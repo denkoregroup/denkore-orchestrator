@@ -1,10 +1,4 @@
-import {
-  type Gate,
-  GATE_KIND_BY_STATE,
-  isGateApproved,
-  openGate,
-  updateGateSha,
-} from "./gates";
+import { type Approval, type Gate, GATE_KIND_BY_STATE, openGate, updateGateSha } from "./gates";
 import { canTransition, isGateState, isTerminal, type RunState } from "./states";
 
 export const DEFAULT_MAX_TEST_RETRIES = 3;
@@ -17,6 +11,8 @@ export interface RunContext {
   maxTestRetries: number;
   /** The gate for the current gate state, if any. */
   gate: Gate | null;
+  /** Every approval the reducer accepted, oldest first. */
+  approvals: readonly Approval[];
 }
 
 export type RunEvent =
@@ -27,7 +23,8 @@ export type RunEvent =
   | { type: "tests_failed" }
   | { type: "verify_passed"; commitSha: string }
   | { type: "verify_failed" }
-  | { type: "approve" }
+  /** Passes the gate only if commitSha is the SHA the gate covers right now. */
+  | { type: "approve"; approvedBy: string; commitSha: string }
   | { type: "request_changes" }
   | { type: "gate_sha_changed"; commitSha: string }
   | { type: "deployed" }
@@ -45,7 +42,7 @@ export function createRun(maxTestRetries = DEFAULT_MAX_TEST_RETRIES): RunContext
   if (!Number.isInteger(maxTestRetries) || maxTestRetries < 0) {
     throw new Error("maxTestRetries must be a non-negative integer");
   }
-  return { state: "queued", testFailures: 0, maxTestRetries, gate: null };
+  return { state: "queued", testFailures: 0, maxTestRetries, gate: null, approvals: [] };
 }
 
 const FORWARD_FROM_GATE = {
@@ -128,10 +125,15 @@ export function transition(run: RunContext, event: RunEvent): TransitionResult {
       const gate = run.gate;
       if (!gate) return { ok: false, error: `Gate state "${run.state}" has no gate` };
       if (event.type === "approve") {
-        if (!isGateApproved(gate)) {
-          return { ok: false, error: `Gate has no valid approval for ${gate.commitSha}` };
+        if (event.commitSha !== gate.commitSha) {
+          return {
+            ok: false,
+            error: `Approval is for ${event.commitSha} but the gate covers ${gate.commitSha}`,
+          };
         }
-        return moveTo(run, FORWARD_FROM_GATE[run.state]);
+        if (!event.approvedBy) return { ok: false, error: "Approval has no approver" };
+        const approval: Approval = { kind: gate.kind, approvedBy: event.approvedBy, commitSha: gate.commitSha };
+        return moveTo(run, FORWARD_FROM_GATE[run.state], { approvals: [...run.approvals, approval] });
       }
       if (event.type === "request_changes") return moveTo(run, BACK_FROM_GATE[run.state]);
       if (event.type === "gate_sha_changed") {

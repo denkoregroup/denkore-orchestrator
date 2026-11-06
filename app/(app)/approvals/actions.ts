@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { scheduleAdvance } from "@/lib/conductor/schedule";
 import { getGateForDecision, insertApproval } from "@/lib/data/gates";
 import {
   DECISION_MESSAGES,
@@ -46,6 +47,8 @@ export async function decideGateAction(_prev: DecisionState, formData: FormData)
   });
   if (error) return fail(friendlyApprovalError(error));
 
+  // The Conductor reacts to the decision after this response is sent.
+  scheduleAdvance(gate.runId);
   revalidatePath("/approvals");
   const project = gate.registryId ?? "this project";
   return {
