@@ -141,6 +141,9 @@ export async function crawl(options: CrawlOptions): Promise<CrawlResult> {
     const loaded = fetch.status === 200 && !fetch.error && isHtml(fetch) && isSameSite(target, new URL(fetch.finalUrl));
     const result: PageResult = { url, fetch, facts: loaded ? extractFacts(fetch.body) : null };
     pages.push(result);
+    // A page that redirected (e.g. the apex to www) is already read at its
+    // final address; don't queue that address again when a link points to it.
+    queued.add(new URL(fetch.finalUrl).toString());
     for (const href of result.facts?.links ?? []) {
       const link = resolveLink(href, fetch.finalUrl);
       if (!link || !isSameSite(target, link)) continue;

@@ -186,3 +186,23 @@ describe("defective fixture site", () => {
     expect(again.counts).toEqual(report.counts);
   });
 });
+
+describe("a start address that redirects", () => {
+  it("reads the page it lands on once, not again when a link points back to it", async () => {
+    const { origin, secure } = await site(
+      (o) => ({
+        "/start": { status: 301, headers: { location: `${o}/` } },
+        "/": pageRoute(o, "/", { body: '<h1>Home</h1><a href="/">Home</a><a href="/about">About</a>' }),
+        "/about": pageRoute(o, "/about", { body: '<h1>About</h1><a href="/">Home</a>' }),
+      }),
+      () => ({}),
+    );
+    const report = await runAudit({
+      url: `${origin}/start`,
+      httpProbeUrl: null, // the http:// probe would also land on "/"; leave it out
+      fetcher: createFetcher({ allowLocal: true, proxy: null, ca: tls.cert, delayMs: 0 }),
+    });
+    expect(secure.hits.filter((h) => h.path === "/")).toHaveLength(1);
+    expect(report.pagesChecked).toBe(2);
+  });
+});
