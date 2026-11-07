@@ -1,24 +1,8 @@
-import { countBySeverity, finding, sortFindings, type AuditReport, type Finding } from "@/lib/audits/types";
+import type { Finding } from "@/lib/audits/types";
+import { auditReport as report, findings } from "@/test-utils/site-reports";
 import { diffReports } from "../diff";
 
-const SITE = "https://example.com";
-const title = finding({ check: "page.title", severity: "warn", url: `${SITE}/`, message: "No title." });
-const desc = finding({ check: "page.description", severity: "warn", url: `${SITE}/`, message: "No description." });
-const robots = finding({ check: "site.robots", severity: "info", url: `${SITE}/robots.txt`, message: "No robots.txt." });
-const broken = finding({ check: "page.broken-link", severity: "fail", url: `${SITE}/gone`, message: "Broken link." });
-
-function report(findings: Finding[], startedAt = "2026-11-01T10:00:00.000Z"): AuditReport {
-  const sorted = sortFindings(findings);
-  return {
-    schemaVersion: 1,
-    target: `${SITE}/`,
-    startedAt,
-    finishedAt: startedAt,
-    pagesChecked: 1,
-    findings: sorted,
-    counts: countBySeverity(sorted),
-  };
-}
+const { noTitle: title, noDescription: desc, noRobots: robots, brokenLink: broken } = findings;
 
 const ids = (list: Finding[]) => list.map((f) => f.id);
 
@@ -45,7 +29,7 @@ describe("diffReports", () => {
   });
 
   it("two identical reports have nothing new and nothing fixed", () => {
-    const diff = diffReports(report([title, desc]), report([title, desc], "2026-11-08T10:00:00.000Z"));
+    const diff = diffReports(report([title, desc]), report([title, desc], { startedAt: "2026-11-08T10:00:00.000Z" }));
     expect(diff.newFindings).toEqual([]);
     expect(diff.fixed).toEqual([]);
     expect(diff.stillOpen).toHaveLength(2);
