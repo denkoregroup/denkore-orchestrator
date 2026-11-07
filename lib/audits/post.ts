@@ -49,9 +49,12 @@ export async function postReport(url: URL, request: ReturnType<typeof buildPostR
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
   } catch (e) {
-    // fetch hides the reason in `cause` ("connect ECONNREFUSED ...", "getaddrinfo ENOTFOUND ..."); a timeout has none.
+    // fetch hides the reason in `cause` ("connect ECONNREFUSED ...", "getaddrinfo ENOTFOUND ...").
+    // A name with several addresses (localhost) gives an AggregateError with no message, only a code.
+    // A timeout has no cause at all.
     const error = e as Error;
-    throw new Error(`Could not send the report to ${url.origin}: ${error.cause ? (error.cause as Error).message : error.message}`);
+    const cause = error.cause as (Error & { code?: string }) | undefined;
+    throw new Error(`Could not send the report to ${url.origin}: ${cause?.message || cause?.code || error.message}`);
   }
   const text = await response.text();
   if (!response.ok) throw new Error(`The app refused the report (${response.status}): ${text.slice(0, 500)}`);

@@ -50,6 +50,27 @@ describe("buildPostRequest", () => {
   });
 });
 
+describe("postReport when fetch fails", () => {
+  const fetchFails = (error: Error) => jest.spyOn(globalThis, "fetch").mockRejectedValue(error);
+  afterEach(() => jest.restoreAllMocks());
+  const send = () => postReport(new URL("https://app.example/api/audits/report"), buildPostRequest({ report, secret: SECRET }));
+
+  it("gives the cause's message", async () => {
+    fetchFails(new TypeError("fetch failed", { cause: new Error("getaddrinfo ENOTFOUND app.example") }));
+    await expect(send()).rejects.toThrow("Could not send the report to https://app.example: getaddrinfo ENOTFOUND app.example");
+  });
+
+  it("gives the code when the cause has no message (a refused connection to localhost, which has two addresses)", async () => {
+    fetchFails(new TypeError("fetch failed", { cause: Object.assign(new AggregateError([]), { code: "ECONNREFUSED" }) }));
+    await expect(send()).rejects.toThrow("Could not send the report to https://app.example: ECONNREFUSED");
+  });
+
+  it("gives fetch's own message when there is no cause (a timeout)", async () => {
+    fetchFails(new DOMException("The operation was aborted due to timeout", "TimeoutError"));
+    await expect(send()).rejects.toThrow("Could not send the report to https://app.example: The operation was aborted due to timeout");
+  });
+});
+
 describe("postReport against the real ingest handler", () => {
   const servers: http.Server[] = [];
   afterAll(async () => {
@@ -107,9 +128,13 @@ describe("postReport against the real ingest handler", () => {
     expect(other.store.reports).toHaveLength(0);
   });
 
-  it("says so when nothing is listening", async () => {
+  it("says so, with a reason, when nothing is listening", async () => {
     const { url } = await serve(SECRET);
     await Promise.all(servers.map((s) => new Promise((resolve) => s.close(resolve))));
-    await expect(postReport(url, buildPostRequest({ report, secret: SECRET }))).rejects.toThrow(/Could not send the report to http:\/\/localhost:\d+: .*ECONNREFUSED/);
+    // The wording differs by Node version and by whether localhost has one address or two, so only
+    // require that a reason is given.
+    await expect(postReport(url, buildPostRequest({ report, secret: SECRET }))).rejects.toThrow(
+      /Could not send the report to http:\/\/localhost:\d+: \S+/,
+    );
   });
 });
