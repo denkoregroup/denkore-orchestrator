@@ -92,6 +92,13 @@ describe("payload validation", () => {
     expect(res.status).toBe(400);
   });
 
+  it("rejects a target that is not a web address, so no page can fail on it later", async () => {
+    const res = await POST(signed({ report: { ...report, target: "example" } }));
+    expect(res.status).toBe(400);
+    expect((await res.json()).issues[0].path).toEqual(["report", "target"]);
+    expect(store.reports).toHaveLength(0);
+  });
+
   it("rejects a finding with a malformed id", async () => {
     const bad = { ...report, findings: [{ ...report.findings[0], id: "nope" }] };
     expect((await POST(signed({ report: bad }))).status).toBe(400);

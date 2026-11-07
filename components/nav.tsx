@@ -7,6 +7,7 @@ export const NAV_ITEMS = [
   { href: "/prompt", label: "Prompt" },
   { href: "/runs", label: "Runs" },
   { href: "/approvals", label: "Approvals" },
+  { href: "/sites", label: "Sites" },
   { href: "/audit", label: "Audit" },
 ] as const;
 
@@ -17,7 +18,7 @@ export function Nav() {
       aria-label="Main"
       className="fixed inset-x-0 bottom-0 z-10 border-t border-border bg-background pb-[env(safe-area-inset-bottom)] md:static md:border-t-0 md:border-r md:pb-0"
     >
-      <ul className="grid grid-cols-4 md:flex md:flex-col md:gap-1 md:p-3">
+      <ul className="grid grid-cols-5 md:flex md:flex-col md:gap-1 md:p-3">
         {NAV_ITEMS.map(({ href, label }) => {
           const active = pathname === href || pathname.startsWith(`${href}/`);
           return (

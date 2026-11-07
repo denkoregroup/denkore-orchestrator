@@ -5,7 +5,11 @@ import { SIGNATURE_HEADER, verifySignature } from "@/lib/webhooks/signature";
 export const reportPayloadSchema = z.strictObject({
   /** The registry entry the audit was run for (`--project`). Absent for a plain `--url` audit. */
   registryId: z.string().min(1).optional(),
-  report: auditReportSchema,
+  // The pages show the target as a site name, so it must be a web address, as the auditor always makes it.
+  report: auditReportSchema.refine((r) => z.url({ protocol: /^https?$/ }).safeParse(r.target).success, {
+    path: ["target"],
+    message: "target must be a full http or https address",
+  }),
 });
 
 export type ReportPayload = z.infer<typeof reportPayloadSchema>;
