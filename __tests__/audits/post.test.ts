@@ -6,7 +6,7 @@ import type { AddressInfo } from "node:net";
 import { createReportHandler, MemoryReportStore } from "@/lib/site-health/ingest";
 import { verifySignature } from "@/lib/webhooks/signature";
 import { auditReport, findings } from "@/test-utils/site-reports";
-import { buildPostRequest, parsePostUrl, postReport, SIGNATURE_HEADER } from "../post";
+import { buildPostRequest, parsePostUrl, postReport, SIGNATURE_HEADER } from "@/lib/audits/post";
 
 const SECRET = "post-test-secret-not-real";
 const report = auditReport([findings.noTitle, findings.noRobots]);
