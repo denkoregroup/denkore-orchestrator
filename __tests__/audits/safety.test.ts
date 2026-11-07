@@ -141,7 +141,7 @@ describe("requests", () => {
     const site = await serve({ "/": { body: "ok" } });
     await local().fetch(`${site.origin}/`);
     expect(site.hits[0].userAgent).toBe(USER_AGENT);
-    expect(USER_AGENT).toBe("DenkoreAudit/1.0 (+https://denkoregroup.com)");
+    expect(USER_AGENT).toBe("DenkoreAudit/1.0 (+https://www.denkore.com)");
   });
 
   it("tunnels through an HTTPS_PROXY-style CONNECT proxy unless NO_PROXY matches", async () => {

@@ -192,7 +192,7 @@ viewport, canonical link, Open Graph tags, image alt text and structured data
 (JSON-LD).
 
 **How it behaves.** One request at a time, about 250 ms apart, with the user
-agent `DenkoreAudit/1.0 (+https://denkoregroup.com)`. It stays on the site:
+agent `DenkoreAudit/1.0 (+https://www.denkore.com)`. It stays on the site:
 a redirect to another site is reported, never followed. It refuses private,
 loopback and link-local addresses. Each request has a 10 s deadline and a
 2 MB size cap. It respects robots.txt and honours `HTTPS_PROXY` / `NO_PROXY`.
