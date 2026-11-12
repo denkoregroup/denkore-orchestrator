@@ -145,7 +145,7 @@ the env vars, walk through:
     setup, Sign in with GitHub). Also try the Cancel button on GitHub's prompt:
     `/login` should show "Sign-in didn't complete. Try again."
 17. Daily audits: set the repository variable `AUDIT_REPORT_URL` and check the
-    secret `STEP_WEBHOOK_SECRET` (README, Daily audits). In the Actions tab run
+    secret `STEP_WEBHOOK_SECRET` (README, one-time setup, GitHub Actions). In the Actions tab run
     "Audit schedule" by hand. It goes green, and `/sites` shows a report from
     minutes ago for denkore.com, ggrmusic.com and dclarkdev.com.
 18. Watchdog: after a few days of daily runs, `/sites` shows no Overdue badge.
