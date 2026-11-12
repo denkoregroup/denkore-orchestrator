@@ -141,9 +141,9 @@ the env vars, walk through:
 16. Sign in with GitHub from each place: on `http://localhost:3000`, on a Vercel
     preview, and on production. Each must come back to the address you started
     from and land on `/approvals`. If it opens the Site URL instead, that
-    address is missing from the Redirect URLs allowlist (README, Supabase setup,
-    step 6). Also try the Cancel button on GitHub's prompt: `/login` should show
-    "Sign-in didn't complete. Try again."
+    address is missing from the Redirect URLs allowlist (README, one-time
+    setup, Sign in with GitHub). Also try the Cancel button on GitHub's prompt:
+    `/login` should show "Sign-in didn't complete. Try again."
 
 ## Reopen a changes-requested gate at the same SHA
 
