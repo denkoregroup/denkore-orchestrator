@@ -12,6 +12,10 @@ jest.mock("@/lib/supabase/server", () => ({ createClient: () => createClient() }
 jest.mock("next/cache", () => ({ revalidatePath: (p: string) => revalidatePath(p) }));
 const scheduleAdvance = jest.fn();
 jest.mock("@/lib/conductor/schedule", () => ({ scheduleAdvance: (id: string) => scheduleAdvance(id) }));
+// The sample project (example-app), not the real registry.
+jest.mock("@/lib/registry/cached", () => ({
+  getRegistry: async () => (await import("@/lib/registry/loader")).loadRegistry((await import("@/test-utils/registry")).EXAMPLE_REGISTRY_DIR),
+}));
 
 import { decideGateAction } from "@/app/(app)/approvals/actions";
 import { DECISION_MESSAGES, INITIAL_DECISION_STATE, PR_REVIEW_ATTESTATION } from "@/lib/approvals/decide";

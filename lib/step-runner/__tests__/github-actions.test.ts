@@ -5,9 +5,10 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { parseRegistryEntry } from "@/lib/registry";
 import { GitHubActionsRunner, stepOutputSchema, type StepInput } from "..";
+import { EXAMPLE_REGISTRY_DIR } from "@/test-utils/registry";
 
 async function input(): Promise<StepInput> {
-  const source = await readFile(path.join(process.cwd(), "registry", "example-app.yaml"), "utf8");
+  const source = await readFile(path.join(EXAMPLE_REGISTRY_DIR, "example-app.yaml"), "utf8");
   return {
     runId: "6f1c2b9e-4a3d-4c1e-9b7a-2d5e8f0a1b3c",
     step: "spec",

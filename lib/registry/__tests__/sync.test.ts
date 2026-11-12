@@ -1,15 +1,15 @@
 /**
  * @jest-environment node
  */
-import path from "node:path";
 import { loadRegistry } from "../loader";
 import { planRegistrySync } from "../sync";
+import { EXAMPLE_REGISTRY_DIR } from "@/test-utils/registry";
 
 const OWNER = "6f1c2b9e-4a3d-4c1e-9b7a-2d5e8f0a1b3c";
 const OTHER = "7a2d3c0f-5b4e-4d2f-8c8b-3e6f9a1b2c4d";
 
 async function entries() {
-  const registry = await loadRegistry(path.join(process.cwd(), "registry"));
+  const registry = await loadRegistry(EXAMPLE_REGISTRY_DIR);
   return [...registry.values()];
 }
 

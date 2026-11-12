@@ -1,4 +1,4 @@
-# Example registry entry. Integrations list env var NAMES only, never values.
+# Sample registry entry, used by the tests (the real registry is registry/*.yaml). Integrations list env var NAMES only, never values.
 id: example-app
 repo: denkoregroup/example-app
 gateTier: app

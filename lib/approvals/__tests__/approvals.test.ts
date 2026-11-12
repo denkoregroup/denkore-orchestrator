@@ -1,7 +1,6 @@
 /**
  * @jest-environment node
  */
-import path from "node:path";
 import { loadRegistry } from "@/lib/registry/loader";
 import type { RegistryEntry } from "@/lib/registry/schema";
 import { pendingGate, SHA_MOVED, SHA_SHOWN, step, VALID_GATE_REVIEW } from "@/test-utils/fixtures";
@@ -15,10 +14,11 @@ import {
 import { toGateReview } from "../map";
 import { approvalModeFor } from "../mode";
 import { gateReviewSchema } from "../schema";
+import { EXAMPLE_REGISTRY_DIR } from "@/test-utils/registry";
 
 let example: RegistryEntry;
 beforeAll(async () => {
-  example = (await loadRegistry(path.join(process.cwd(), "registry"))).get("example-app")!;
+  example = (await loadRegistry(EXAMPLE_REGISTRY_DIR)).get("example-app")!;
 });
 
 describe("gateReviewSchema", () => {

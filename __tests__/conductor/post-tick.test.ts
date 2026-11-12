@@ -16,6 +16,7 @@ import { MemoryConductorStore } from "@/lib/conductor/memory-store";
 import { createTickHandler } from "@/lib/conductor/tick";
 import { loadRegistry } from "@/lib/registry/loader";
 import { GitHubActionsRunner } from "@/lib/step-runner/github-actions";
+import { EXAMPLE_REGISTRY_DIR } from "@/test-utils/registry";
 
 jest.setTimeout(30_000);
 
@@ -62,7 +63,7 @@ function runScript(env: Record<string, string | undefined>) {
 }
 
 async function conductor() {
-  const registry = await loadRegistry(path.join(process.cwd(), "registry"));
+  const registry = await loadRegistry(EXAMPLE_REGISTRY_DIR);
   const store = new MemoryConductorStore();
   const deps: ConductorDeps = {
     store,

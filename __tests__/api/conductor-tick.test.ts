@@ -1,7 +1,6 @@
 /**
  * @jest-environment node
  */
-import path from "node:path";
 import { advanceRun, type ConductorDeps } from "@/lib/conductor/advance";
 import { STEP_DEADLINE_SECONDS } from "@/lib/conductor/decide";
 import { LIMITS } from "@/lib/conductor/limits";
@@ -10,6 +9,7 @@ import { createTickHandler } from "@/lib/conductor/tick";
 import { loadRegistry } from "@/lib/registry/loader";
 import { GitHubActionsRunner } from "@/lib/step-runner/github-actions";
 import { sign, SIGNATURE_HEADER } from "@/lib/webhooks/signature";
+import { EXAMPLE_REGISTRY_DIR } from "@/test-utils/registry";
 
 const SECRET = "test-secret-not-real";
 
@@ -20,7 +20,7 @@ function request(body: string, signature: string | null) {
 }
 
 async function memoryTick() {
-  const registry = await loadRegistry(path.join(process.cwd(), "registry"));
+  const registry = await loadRegistry(EXAMPLE_REGISTRY_DIR);
   const store = new MemoryConductorStore();
   const deps: ConductorDeps = {
     store,
