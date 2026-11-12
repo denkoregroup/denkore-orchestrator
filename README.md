@@ -50,18 +50,13 @@ The database is set up by hand; see [Supabase setup](#supabase-setup).
    Nothing runs migrations automatically.
 3. Under Authentication, turn off **Allow new users to sign up**. Create the
    owner user by hand and put its UUID in `DENKORE_OWNER_USER_ID`.
-4. Edit the **Magic Link** email template so the link is:
-
-   ```
-   {{ .RedirectTo }}?token_hash={{ .TokenHash }}&type=email
-   ```
-
-   The app sends `emailRedirectTo` as `<where you signed in from>/auth/confirm`
-   (the request's Origin header, or its host), so the link brings you back to
-   localhost, the Vercel preview or production, whichever you used. If the
-   request has neither, signing in fails with an error instead of guessing an
-   address.
-5. Under URL Configuration, set the **Site URL** to the production URL and add
+4. Create a GitHub OAuth app (GitHub > Settings > Developer settings > OAuth
+   Apps > New). Its **Authorization callback URL** is the Supabase project's
+   own callback, `https://<project-ref>.supabase.co/auth/v1/callback`. Copy the
+   client ID and generate a client secret.
+5. In Supabase, under Authentication > Sign In / Providers, enable **GitHub**
+   and paste in that client ID and secret.
+6. Under URL Configuration, set the **Site URL** to the production URL and add
    these **Redirect URLs**:
 
    - `http://localhost:3000/**`
@@ -69,18 +64,23 @@ The database is set up by hand; see [Supabase setup](#supabase-setup).
      previews, for example `denkore-orchestrator-git-<branch>-denkoregroup.vercel.app`)
    - `https://<production-domain>/**`
 
-   Supabase only accepts a redirect that matches this list. Anything else is
-   replaced by the Site URL, and the emailed link then lands on the wrong page,
-   so a new preview address or port needs an entry here first.
-6. Under **Settings > API Keys > "Publishable and secret API keys"**, copy the
+   The app asks GitHub to return to `<where you signed in from>/auth/callback`.
+   Supabase only accepts an address on this list and otherwise falls back to the
+   Site URL, so a new preview address or port needs an entry first.
+7. Sign in once with the GitHub account whose **verified** email matches the
+   owner's. Supabase links it to the existing owner user. If it creates a new
+   user instead (check Authentication > Users), set `DENKORE_OWNER_USER_ID` to
+   the new id, in Vercel for Production and Preview and in `.env.local`.
+8. Afterwards you can turn off email and password sign-in in Supabase.
+9. Under **Settings > API Keys > "Publishable and secret API keys"**, copy the
    publishable key into `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` and a secret key
    (`sb_secret_...`) into `SUPABASE_SECRET_KEY`. The secret key is server only:
    it acts as the `service_role` Postgres role, so never expose it to the
    browser. Then deactivate the legacy `anon` and `service_role` keys.
-7. Put `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SECRET_KEY` and
-   `DENKORE_OWNER_USER_ID` in `.env.local`, then run `pnpm registry:sync`. It
-   creates one project per `registry/*.yaml` entry and prints what it inserted,
-   changed, or left alone. Run it again whenever the registry changes.
+10. Put `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SECRET_KEY` and
+    `DENKORE_OWNER_USER_ID` in `.env.local`, then run `pnpm registry:sync`. It
+    creates one project per `registry/*.yaml` entry and prints what it inserted,
+    changed, or left alone. Run it again whenever the registry changes.
 
 ## Conductor
 
