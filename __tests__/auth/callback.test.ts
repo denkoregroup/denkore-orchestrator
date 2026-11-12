@@ -66,10 +66,29 @@ describe("/auth/callback", () => {
     expect(location(res).pathname + location(res).search).toBe("/login?error=sign_in_failed");
   });
 
-  it("treats GitHub's refusal (an error and no code) as a failed sign-in", async () => {
-    const res = await call("?error=access_denied&error_description=The+user+denied");
-    expect(location(res).search).toBe("?error=sign_in_failed");
-    expect(logged()).not.toContain("denied");
+  it("treats GitHub's refusal (error parameters and no code) as a failed sign-in, logging only the error_code", async () => {
+    const res = await call(
+      "?error=access_denied&error_code=signup_disabled&error_description=Signups+not+allowed+for+someone%40example.com",
+    );
+    expect(location(res).pathname + location(res).search).toBe("/login?error=sign_in_failed");
+    expect(exchangeCodeForSession).not.toHaveBeenCalled();
+    expect(consoleError).toHaveBeenCalledWith("sign-in callback: no code", "signup_disabled");
+    expect(logged()).not.toContain("access_denied");
+    expect(logged()).not.toContain("Signups");
+    expect(logged()).not.toContain("someone");
+  });
+
+  it("says there was no error_code when GitHub sent none", async () => {
+    await call("?error=access_denied");
+    expect(consoleError).toHaveBeenCalledWith("sign-in callback: no code", "no error_code");
+    expect(logged()).not.toContain("access_denied");
+  });
+
+  it("does not log an error_code that is not a plain code, so a crafted address cannot write into the log", async () => {
+    await call(`?error_code=${encodeURIComponent("x\nFAKE LOG LINE for owner@example.com")}`);
+    expect(consoleError).toHaveBeenCalledWith("sign-in callback: no code", "unrecognised error_code");
+    expect(logged()).not.toContain("FAKE");
+    expect(logged()).not.toContain("owner@example.com");
   });
 
   it("when the exchange fails, shows the failed message and logs the error code only", async () => {
