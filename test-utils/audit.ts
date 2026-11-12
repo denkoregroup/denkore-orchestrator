@@ -1,6 +1,6 @@
 import type { FetchResult } from "@/lib/audits/fetcher";
 import { extractFacts } from "@/lib/audits/html";
-import type { CrawlResult, PageResult, SiteProbes } from "@/lib/audits/model";
+import { TTFB_SAMPLES, type CrawlResult, type PageResult, type SiteProbes } from "@/lib/audits/model";
 
 export const SITE = "https://bistro.example";
 
@@ -59,8 +59,14 @@ export function cleanHtml(parts: {
   ].join("\n");
 }
 
-export function page(url: string, html: string, fetchOverrides: Partial<FetchResult> = {}): PageResult {
-  return { url, fetch: fetched(url, { body: html, ...fetchOverrides }), facts: extractFacts(html) };
+/**
+ * A crawled page. Its time-to-first-byte measurements default to three equal ones taken from the
+ * fetch's ttfbMs (none if that is null); pass `ttfbSamplesMs` to set them.
+ */
+export function page(url: string, html: string, fetchOverrides: Partial<FetchResult> = {}, ttfbSamplesMs?: number[]): PageResult {
+  const fetch = fetched(url, { body: html, ...fetchOverrides });
+  const samples = ttfbSamplesMs ?? (fetch.ttfbMs === null ? [] : Array.from({ length: TTFB_SAMPLES }, () => fetch.ttfbMs as number));
+  return { url, fetch, ttfbSamplesMs: samples, facts: extractFacts(html) };
 }
 
 export function crawlOf(input: {
