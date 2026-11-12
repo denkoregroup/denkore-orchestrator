@@ -89,8 +89,10 @@ describe("limits", () => {
     const site = await serve({}, { fallback: { body: cleanHtml({ body: `<h1>x</h1>${links}` }) } });
     const report = await runAudit({ url: `${site.origin}/`, maxPages: 5, httpProbeUrl: null, fetcher: local() });
     expect(report.pagesChecked).toBe(5);
+    // Five pages, each requested three times (its fetch and two more to measure its response time).
     const pageHits = site.hits.filter((h) => /^\/(p\d+)?$/.test(h.path));
-    expect(pageHits).toHaveLength(5);
+    expect(new Set(pageHits.map((h) => h.path)).size).toBe(5);
+    expect(pageHits).toHaveLength(5 * 3);
   });
 
   it("defaults to at most 25 pages", async () => {

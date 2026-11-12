@@ -1,11 +1,20 @@
 import type { FetchResult } from "./fetcher";
 import type { PageFacts } from "./html";
 
+/** How many times a page's time to first byte is measured. Odd, so there is a middle one. */
+export const TTFB_SAMPLES = 3;
+
 /** One crawled URL. */
 export interface PageResult {
   /** The URL as queued: absolute, no fragment. */
   url: string;
   fetch: FetchResult;
+  /**
+   * Time to first byte of each measurement, in order: the page's own fetch, then more of the same
+   * request, one after another. Empty when the page's own fetch failed. Shorter than TTFB_SAMPLES
+   * when a repeat failed, which is not enough to judge.
+   */
+  ttfbSamplesMs: number[];
   /** Present only for a same-site HTML page that loaded (status 200). */
   facts: PageFacts | null;
 }
