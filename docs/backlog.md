@@ -53,7 +53,7 @@ Code-owner review becomes useful once others contribute.
 
 ## Live updates with Supabase Realtime
 
-**Why:** `/runs`, `/runs/[id]`, `/approvals` and `/audit` show data as of page
+**Why:** `/runs`, `/runs/[id]`, `/approvals` and `/activity` show data as of page
 load. The owner has to refresh to see a run move or a new gate appear.
 
 **Suggested fix:** Subscribe to `postgres_changes` on `runs`, `gates` and
@@ -86,7 +86,7 @@ signed URLs to the Conductor when it picks up the run.
 reachable by URL or through the audit log.
 
 **Suggested fix:** Keyset pagination on `(created_at, id)` with a "Load more"
-button, like `/audit`.
+button, like `/activity`.
 
 ## Manual end-to-end checklist (once the database exists)
 
@@ -102,7 +102,7 @@ the env vars, walk through:
    out again and sees "This GitHub account isn't allowed in."
 3. `/prompt`: a 5-character prompt is refused; a real one opens `/runs/[id]`
    showing "Waiting to start".
-4. `/audit` shows "Run created" by "You" for that run, and the run filter works.
+4. `/activity` shows "Run created" by "You" for that run, and the run filter works.
 5. As service role, insert a gate and a succeeded step with
    `result.gateReview`. `/approvals` shows the card with the summary.
 6. One-tap gate: Approve works and the card disappears with a confirmation.
@@ -284,3 +284,16 @@ ids, and keep them as separate checks so their findings diff cleanly.
 **Suggested fix:** Take these one at a time as real runs show which matter.
 A HEAD request for every discovered internal link (within a second cap)
 would close the first gap cheaply.
+
+## One time zone on every page
+
+**Why:** `/sites` and its report page now show every time in Eastern time through
+`formatEt` (`lib/format.ts`), so a report reads the same on localhost and on
+Vercel. `/runs`, `/runs/[id]`, `/approvals` and `/activity` still use
+`LocalTime`: UTC from the server, then the viewer's own time zone after the page
+loads. The same run can therefore show a different time depending on where it is
+opened.
+
+**Suggested fix:** Use `formatEt` (or a `LocalTime` built on it) everywhere, and
+drop the UTC-then-local switch. Decide first whether Eastern is right for every
+page, or whether it should be a setting.

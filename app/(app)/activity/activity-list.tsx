@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { EventList, type EventItem } from "@/components/event-list";
 import { loadMoreEvents } from "./actions";
 
-export function AuditList({
+export function ActivityList({
   initialEvents,
   initialCursor,
   runId,

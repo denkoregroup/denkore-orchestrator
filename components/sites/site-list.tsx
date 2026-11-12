@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { LocalTime } from "@/components/local-time";
+import { EtTime } from "@/components/sites/et-time";
 import { pagesLabel, SEVERITY_GROUPS, siteName } from "@/lib/site-health/labels";
 import type { SiteSummary } from "@/lib/site-health/queries";
 
@@ -24,7 +24,7 @@ export function SiteList({ sites, truncated }: { sites: SiteSummary[]; truncated
               <span className="flex flex-wrap items-baseline justify-between gap-x-3">
                 <span className="break-all font-medium">{siteName(site.target)}</span>
                 <span className="text-sm text-muted">
-                  <LocalTime iso={site.startedAt} /> · {pagesLabel(site.pagesChecked)}
+                  <EtTime iso={site.startedAt} /> · {pagesLabel(site.pagesChecked)}
                 </span>
               </span>
               <dl className="grid grid-cols-3 gap-2 text-sm">

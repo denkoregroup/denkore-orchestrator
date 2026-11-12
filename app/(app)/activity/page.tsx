@@ -3,16 +3,16 @@ import { z } from "zod";
 import { listEvents } from "@/lib/data/events";
 import { listRuns } from "@/lib/data/runs";
 import { formatUtc } from "@/lib/format";
-import { AuditList } from "./audit-list";
+import { ActivityList } from "./activity-list";
 
-export const metadata: Metadata = { title: "Audit · Denkore" };
+export const metadata: Metadata = { title: "Activity · Denkore" };
 
 function runOptionLabel(project: string, prompt: string, createdAt: string) {
   const snippet = prompt.length > 40 ? `${prompt.slice(0, 40)}…` : prompt;
   return `${project} · ${snippet} · ${formatUtc(createdAt)}`;
 }
 
-export default async function AuditPage(props: PageProps<"/audit">) {
+export default async function ActivityPage(props: PageProps<"/activity">) {
   const { run } = await props.searchParams;
   const runId = typeof run === "string" && z.uuid().safeParse(run).success ? run : undefined;
 
@@ -21,7 +21,7 @@ export default async function AuditPage(props: PageProps<"/audit">) {
 
   return (
     <section className="mx-auto max-w-2xl space-y-4">
-      <h1 className="text-xl font-semibold">Audit</h1>
+      <h1 className="text-xl font-semibold">Activity</h1>
       <p className="text-muted">Everything that happened, newest first. Entries can’t be edited or removed.</p>
 
       <form method="get" className="flex flex-col gap-2 sm:flex-row sm:items-end">
@@ -54,7 +54,7 @@ export default async function AuditPage(props: PageProps<"/audit">) {
           {runId ? "Nothing has been recorded for this run yet." : "Nothing has been recorded yet."}
         </p>
       ) : (
-        <AuditList
+        <ActivityList
           key={runId ?? "all"}
           initialEvents={page.events}
           initialCursor={page.nextCursor}
