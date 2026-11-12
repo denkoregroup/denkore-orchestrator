@@ -137,6 +137,11 @@ the env vars, walk through:
     refused. Check the row's `project_id` is the `example-app` project.
 15. Sign in as the owner and open `/sites` on a phone-sized screen (360px): the
     list and the detail page read without sideways scrolling.
+16. Magic-link sign-in from each place: on `http://localhost:3000`, on a Vercel
+    preview, and on production. The emailed link must open the same address you
+    signed in from (check the address bar), land on `/approvals`, and not bounce
+    to `/login`. If a link opens the Site URL instead, that address is missing
+    from the Redirect URLs allowlist (README, Supabase setup, step 5).
 
 ## Reopen a changes-requested gate at the same SHA
 

@@ -53,12 +53,25 @@ The database is set up by hand; see [Supabase setup](#supabase-setup).
 4. Edit the **Magic Link** email template so the link is:
 
    ```
-   {{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=email
+   {{ .RedirectTo }}?token_hash={{ .TokenHash }}&type=email
    ```
 
+   The app sends `emailRedirectTo` as `<where you signed in from>/auth/confirm`
+   (the request's Origin header, or its host), so the link brings you back to
+   localhost, the Vercel preview or production, whichever you used. If the
+   request has neither, signing in fails with an error instead of guessing an
+   address.
 5. Under URL Configuration, set the **Site URL** to the production URL and add
-   redirect URLs for local and production, for example
-   `http://localhost:3000/**` and `https://<production-domain>/**`.
+   these **Redirect URLs**:
+
+   - `http://localhost:3000/**`
+   - `https://denkore-orchestrator-*-denkoregroup.vercel.app/**` (Vercel
+     previews, for example `denkore-orchestrator-git-<branch>-denkoregroup.vercel.app`)
+   - `https://<production-domain>/**`
+
+   Supabase only accepts a redirect that matches this list. Anything else is
+   replaced by the Site URL, and the emailed link then lands on the wrong page,
+   so a new preview address or port needs an entry here first.
 6. Under **Settings > API Keys > "Publishable and secret API keys"**, copy the
    publishable key into `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` and a secret key
    (`sb_secret_...`) into `SUPABASE_SECRET_KEY`. The secret key is server only:
