@@ -16,6 +16,22 @@ import { loadRegistry } from "../lib/registry/loader";
 const USAGE =
   "Usage: pnpm audit:run (--url <https://...> | --project <registryId>) [--max-pages <n>] [--out <file>] [--fail-on warn|fail] [--post <url>]";
 
+const HELP = `${USAGE}
+
+Audits a public website and writes the findings as JSON.
+
+  --url <https://...>     The site to audit. Pass this or --project.
+  --project <registryId>  A registry entry whose audits block names the site (url, maxPages, ignorePaths).
+  --max-pages <n>         Pages to read, 1 to 500. Default 25.
+  --out <file>            Where to write the report. Default ./audit-report.json (git-ignored).
+  --fail-on warn|fail     Exit 1 if there are findings at that level or worse. Default: never.
+  --post <url>            Also send the report to the app, for example https://<app>/api/audits/report.
+                          Signed with STEP_WEBHOOK_SECRET from the environment or .env.local.
+                          https only (http is allowed for localhost). The report is stored once per site and start time.
+  --help                  Show this.
+
+Exit codes: 0 done, 1 --fail-on matched, 2 bad arguments or a failure.`;
+
 function parseArgs(argv: string[]) {
   const flags = new Map<string, string>();
   for (let i = 0; i < argv.length; i++) {
@@ -48,6 +64,10 @@ function postSecret(): string {
 }
 
 async function main() {
+  if (process.argv.slice(2).includes("--help")) {
+    console.log(HELP);
+    process.exit(0);
+  }
   let args: ReturnType<typeof parseArgs>;
   try {
     args = parseArgs(process.argv.slice(2));

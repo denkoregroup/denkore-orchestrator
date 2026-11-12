@@ -1,7 +1,7 @@
 /**
  * @jest-environment node
  *
- * Runs the real scripts/audit-run.ts. Every case here must fail before the
+ * Runs the real scripts/audit-run.ts. Every case here must finish before the
  * crawl starts, so none of them touches the network.
  */
 import { spawn } from "node:child_process";
@@ -46,5 +46,18 @@ describe("audit:run --post", () => {
     const { code, output } = await runCli(["--url", "https://example.invalid", "--post"]);
     expect(code).toBe(2);
     expect(output).toMatch(/--post needs a value/);
+  });
+});
+
+describe("audit:run --help", () => {
+  it("prints every flag and the exit codes, and starts no audit", async () => {
+    const { code, output } = await runCli(["--help"]);
+    expect(code).toBe(0);
+    for (const flag of ["--url", "--project", "--max-pages", "--out", "--fail-on", "--post", "--help"]) {
+      expect(output).toContain(flag);
+    }
+    expect(output).toMatch(/STEP_WEBHOOK_SECRET/);
+    expect(output).toMatch(/Exit codes/);
+    expect(output).not.toMatch(/Audit of/);
   });
 });
