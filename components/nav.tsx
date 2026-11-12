@@ -8,7 +8,7 @@ export const NAV_ITEMS = [
   { href: "/runs", label: "Runs" },
   { href: "/approvals", label: "Approvals" },
   { href: "/sites", label: "Sites" },
-  { href: "/audit", label: "Audit" },
+  { href: "/activity", label: "Activity" },
 ] as const;
 
 export function Nav() {

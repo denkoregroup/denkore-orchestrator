@@ -7,6 +7,11 @@ const nextConfig: NextConfig = {
   outputFileTracingIncludes: {
     "/**": ["./registry/**/*.yaml"],
   },
+  // /audit was renamed /activity (it is the Conductor's event log, not the site audits). Old links
+  // and bookmarks keep working; query strings such as ?run=<id> pass through.
+  async redirects() {
+    return [{ source: "/audit", destination: "/activity", permanent: false }];
+  },
   turbopack: {
     rules: {
       "*.css": {
