@@ -26,6 +26,7 @@ Single user: only the Supabase Auth user in `DENKORE_OWNER_USER_ID` can sign in.
 | `scripts/simulate-step.ts` | `pnpm conductor:simulate`: fakes a step completion for hand testing |
 | `lib/audits/` | Public-URL site auditor: fetcher (the only network code), crawl, one module per check in `checks/`, report format |
 | `scripts/audit-run.ts` | `pnpm audit:run`: audits a site, writes the findings JSON, and with `--post` sends it to the app |
+| `scripts/audit-schedule.ts` | `pnpm audit:schedule`: the daily job. Audits every registry entry that has an audits block and posts each report |
 | `lib/site-health/` | Stored audit reports: the signed ingest handler, the Supabase store, owner reads for `/sites`, and `diffReports` (new, still open, fixed). Imports types from `lib/audits`; `lib/audits` never imports it |
 
 ## Run
@@ -191,9 +192,9 @@ and no database; `--post` (below) also stores the report in the app.
 
 ```sh
 pnpm audit:run --url https://example.com
-pnpm audit:run --project example-app          # uses the registry entry's audits block
+pnpm audit:run --project dclarkdev-com        # uses the registry entry's audits block
 pnpm audit:run --url https://example.com --max-pages 10 --out report.json --fail-on warn
-pnpm audit:run --project example-app --post https://<app>/api/audits/report   # also store it, see below
+pnpm audit:run --project dclarkdev-com --post https://<app>/api/audits/report   # also store it, see below
 ```
 
 | Flag | Meaning |
@@ -246,7 +247,7 @@ app keeps it and `/sites` can show it.
    read and insert, and nobody can update or delete a row.
 2. Put the same `STEP_WEBHOOK_SECRET` the app uses in your environment or
    `.env.local` (`pnpm audit:run` reads `.env.local`). No new variable.
-3. Run `pnpm audit:run --project example-app --post https://<app>/api/audits/report`.
+3. Run `pnpm audit:run --project dclarkdev-com --post https://<app>/api/audits/report`.
    With `--project`, the report is linked to that project once `pnpm registry:sync`
    has created it; with `--url` it is stored without a project.
 
@@ -266,6 +267,28 @@ site shows that report grouped as Needs fixing, Worth fixing and Good to know,
 and, compared with the report just before it, what is new and what was fixed.
 Findings are matched by id, so a problem that changes from Worth fixing to
 Needs fixing is still the same problem.
+
+### Daily audits and the watchdog
+
+`.github/workflows/audit-schedule.yml` runs `pnpm audit:schedule` once a day (and on demand from the
+Actions tab: that is the only "run now"; the app has no button for it, so it holds no GitHub
+credential). It audits every `registry/*.yaml` entry with an `audits` block, which for v1 is
+denkore.com, ggrmusic.com and dclarkdev.com, and posts each report, signed like the tick.
+
+One-time setup, in the repository's **Settings > Secrets and variables > Actions**:
+
+- **Variable** `AUDIT_REPORT_URL`: the app's ingest address, e.g. `https://<production-domain>/api/audits/report`.
+- **Secret** `STEP_WEBHOOK_SECRET`: the same value the app and the tick use. Nothing new to create if the tick already works.
+
+One site failing does not stop the others. A site that never answers still gets a report, a single
+"Site unreachable" finding (Worth fixing), so it shows on `/sites`. The job exits non-zero if any
+site failed or was unreachable, so the run shows red.
+
+**Watchdog.** GitHub can delay or skip scheduled runs, so each Conductor tick also checks the newest
+report of every registered site. If it is more than two days old, the tick writes an
+`audit.overdue` event (once per overdue stretch; it shows on Activity) and `/sites` marks the site
+**Overdue**. A registered site with no report yet is listed as "No report yet". A registry entry
+with no project row is named in the tick's answer and log: run `pnpm registry:sync`.
 
 ## Test
 
