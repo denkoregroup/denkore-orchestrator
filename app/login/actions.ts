@@ -2,32 +2,24 @@
 
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { z } from "zod";
 import { requestOrigin } from "@/lib/request-origin";
 import { createClient } from "@/lib/supabase/server";
 
-export interface LoginState {
-  message: string | null;
-}
-
-const emailSchema = z.email();
-
-export async function sendMagicLink(_prev: LoginState, formData: FormData): Promise<LoginState> {
-  const email = emailSchema.safeParse(formData.get("email"));
-  if (!email.success) return { message: "Enter a valid email address." };
-
-  // The link must come back to wherever the form was submitted from: localhost, a Vercel preview or
-  // production. Supabase accepts it only if it is on the Redirect URLs allowlist (see the README).
+/**
+ * Starts Sign in with GitHub (OAuth with PKCE, through Supabase Auth). GitHub sends the browser back
+ * to wherever the button was pressed: localhost, a Vercel preview or production. Supabase accepts
+ * that address only if it is on the Redirect URLs allowlist (see the README).
+ */
+export async function signInWithGitHub() {
   const origin = requestOrigin(await headers());
 
   const supabase = await createClient();
-  // shouldCreateUser: false keeps this a single-user app; the owner is created in Supabase directly.
-  await supabase.auth.signInWithOtp({
-    email: email.data,
-    options: { shouldCreateUser: false, emailRedirectTo: `${origin}/auth/confirm` },
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: "github",
+    options: { redirectTo: `${origin}/auth/callback` },
   });
-  // Same message either way, so the form does not reveal which addresses exist.
-  return { message: "If that address is allowed in, a sign-in link is on its way." };
+  if (error) throw new Error(`GitHub sign-in could not start: ${error.code ?? error.status}`);
+  redirect(data.url);
 }
 
 export async function signOut() {

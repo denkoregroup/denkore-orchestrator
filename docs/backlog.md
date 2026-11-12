@@ -98,7 +98,8 @@ Supabase project.
 the env vars, walk through:
 
 1. `pnpm registry:sync` inserts `example-app`; a second run says `unchanged`.
-2. Sign in by magic link as the owner. Another email cannot sign in.
+2. Sign in with GitHub as the owner. Another GitHub account is signed straight
+   out again and sees "This GitHub account isn't allowed in."
 3. `/prompt`: a 5-character prompt is refused; a real one opens `/runs/[id]`
    showing "Waiting to start".
 4. `/audit` shows "Run created" by "You" for that run, and the run filter works.
@@ -137,11 +138,12 @@ the env vars, walk through:
     refused. Check the row's `project_id` is the `example-app` project.
 15. Sign in as the owner and open `/sites` on a phone-sized screen (360px): the
     list and the detail page read without sideways scrolling.
-16. Magic-link sign-in from each place: on `http://localhost:3000`, on a Vercel
-    preview, and on production. The emailed link must open the same address you
-    signed in from (check the address bar), land on `/approvals`, and not bounce
-    to `/login`. If a link opens the Site URL instead, that address is missing
-    from the Redirect URLs allowlist (README, Supabase setup, step 5).
+16. Sign in with GitHub from each place: on `http://localhost:3000`, on a Vercel
+    preview, and on production. Each must come back to the address you started
+    from and land on `/approvals`. If it opens the Site URL instead, that
+    address is missing from the Redirect URLs allowlist (README, Supabase setup,
+    step 6). Also try the Cancel button on GitHub's prompt: `/login` should show
+    "Sign-in didn't complete. Try again."
 
 ## Reopen a changes-requested gate at the same SHA
 
