@@ -11,7 +11,7 @@ Single user: only the Supabase Auth user in `DENKORE_OWNER_USER_ID` can sign in.
 
 | Path | What it is |
 | --- | --- |
-| `app/` | Next.js App Router: `/prompt` (start a run), `/runs` and `/runs/[id]`, `/approvals` (decide gates), `/audit`, login, webhook |
+| `app/` | Next.js App Router: `/prompt` (start a run), `/runs` and `/runs/[id]`, `/approvals` (decide gates), `/audit`, `/sites` (stored audit reports), login, webhook and the audit report ingest route |
 | `proxy.ts` | Refreshes the Supabase session and redirects anyone but the owner to `/login` |
 | `lib/data/` | Data access layer for pages and actions: checks the owner, then queries as the user (RLS applies); rows parsed with zod |
 | `lib/approvals/` | Gate card types, the `gateReview` schema, approval mode, decision rules |
@@ -25,7 +25,8 @@ Single user: only the Supabase Auth user in `DENKORE_OWNER_USER_ID` can sign in.
 | `scripts/registry-sync.ts` | `pnpm registry:sync`: upserts one project per registry entry |
 | `scripts/simulate-step.ts` | `pnpm conductor:simulate`: fakes a step completion for hand testing |
 | `lib/audits/` | Public-URL site auditor: fetcher (the only network code), crawl, one module per check in `checks/`, report format |
-| `scripts/audit-run.ts` | `pnpm audit:run`: audits a site and writes the findings JSON |
+| `scripts/audit-run.ts` | `pnpm audit:run`: audits a site, writes the findings JSON, and with `--post` sends it to the app |
+| `lib/site-health/` | Stored audit reports: the signed ingest handler, the Supabase store, owner reads for `/sites`, and `diffReports` (new, still open, fixed). Imports types from `lib/audits`; `lib/audits` never imports it |
 
 ## Run
 
@@ -44,7 +45,8 @@ The database is set up by hand; see [Supabase setup](#supabase-setup).
 1. Create the project in a paid organization. Free projects pause after a week
    of inactivity, and a paused project drops incoming webhooks.
 2. In the SQL editor, run `supabase/sql/001_tables.sql`, `002_rls.sql`,
-   `003_functions.sql`, then `004_registry_and_audit.sql`, in that order.
+   `003_functions.sql`, `004_registry_and_audit.sql`, then
+   `005_audit_reports.sql`, in that order.
    Nothing runs migrations automatically.
 3. Under Authentication, turn off **Allow new users to sign up**. Create the
    owner user by hand and put its UUID in `DENKORE_OWNER_USER_ID`.
@@ -169,12 +171,14 @@ To try it by hand: `TICK_URL=... STEP_WEBHOOK_SECRET=... node scripts/post-tick.
 
 `pnpm audit:run` audits a public website: it reads a handful of pages on the
 same site, runs fixed checks, prints a plain-language summary, and writes the
-findings to a JSON file. No model calls, no credentials, no database.
+findings to a JSON file. No model calls. On its own it needs no credentials
+and no database; `--post` (below) also stores the report in the app.
 
 ```sh
 pnpm audit:run --url https://example.com
 pnpm audit:run --project example-app          # uses the registry entry's audits block
 pnpm audit:run --url https://example.com --max-pages 10 --out report.json --fail-on warn
+pnpm audit:run --project example-app --post https://<app>/api/audits/report   # also store it, see below
 ```
 
 | Flag | Meaning |
@@ -183,6 +187,7 @@ pnpm audit:run --url https://example.com --max-pages 10 --out report.json --fail
 | `--max-pages` | Pages to read, default 25. |
 | `--out` | Where to write the report, default `./audit-report.json` (git-ignored). |
 | `--fail-on warn\|fail` | Exit with code 1 if there are findings at that level or worse. Default: never. |
+| `--post <url>` | Also send the report to the app's ingest route (see [Storing reports](#storing-reports-and-the-sites-page)). |
 
 **What it checks.** https and the http-to-https redirect, redirect chains and
 redirects to other sites, www consistency, robots.txt, the sitemap, broken
@@ -192,7 +197,7 @@ viewport, canonical link, Open Graph tags, image alt text and structured data
 (JSON-LD).
 
 **How it behaves.** One request at a time, about 250 ms apart, with the user
-agent `DenkoreAudit/1.0 (+https://denkoregroup.com)`. It stays on the site:
+agent `DenkoreAudit/1.0 (+https://www.denkore.com)`. It stays on the site:
 a redirect to another site is reported, never followed. It refuses private,
 loopback and link-local addresses. Each request has a 10 s deadline and a
 2 MB size cap. It respects robots.txt and honours `HTTPS_PROXY` / `NO_PROXY`.
@@ -204,16 +209,48 @@ each finding is `{ id, check, severity, url, message, evidence? }`.
 - `severity` is `fail` (clearly broken), `warn` (worth fixing) or `info`.
 - `id` is a stable fingerprint of the check, the normalized URL and a
   check-specific key, so the same problem has the same id on every run.
-  Later slices diff runs by id; changing how ids are made is a breaking change.
+  `/sites` and `diffReports` tell new from known problems by id; changing how
+  ids are made is a breaking change.
 - `message` is written for the site owner, not a developer.
 - Findings are sorted the same way every run: severity, check, URL, id.
 
-**Later slices.** This is layer 1 of the "Scheduled audits" design: later
-slices store this output, run it on a schedule, and triage it, using these
-ids to tell new problems from known ones. The items held back for them
-(storage, scheduling, an owner-facing view, model triage, Lighthouse and axe
-checks) are in `docs/backlog.md`. The exact split into slices 2 to 6 follows
-that design doc, which is not in this repository.
+**Later slices.** This is layer 1 of the "Scheduled audits" design. Slice 2
+(below) stores the output and shows it; later slices run it on a schedule and
+triage it. The items held back for them (scheduling, model triage, Lighthouse
+and axe checks, and follow-ups to storage) are in `docs/backlog.md`. The exact
+split into slices 3 to 6 follows that design doc, which is not in this
+repository.
+
+### Storing reports and the Sites page
+
+`--post <url>` sends the finished report to `POST /api/audits/report`, so the
+app keeps it and `/sites` can show it.
+
+1. Run `supabase/sql/005_audit_reports.sql` in the Supabase SQL editor. It
+   adds one table, `audit_reports`: the owner can read it, the secret key can
+   read and insert, and nobody can update or delete a row.
+2. Put the same `STEP_WEBHOOK_SECRET` the app uses in your environment or
+   `.env.local` (`pnpm audit:run` reads `.env.local`). No new variable.
+3. Run `pnpm audit:run --project example-app --post https://<app>/api/audits/report`.
+   With `--project`, the report is linked to that project once `pnpm registry:sync`
+   has created it; with `--url` it is stored without a project.
+
+The script checks the address and the secret before it crawls, refuses
+`http://` unless the host is `localhost`, never follows a redirect, and never
+prints the secret.
+
+The route is signed like the step-complete webhook and the Conductor tick
+(HMAC-SHA256 of the raw body, in `x-denkore-signature: sha256=<hex>`), and the
+proxy skips it. It accepts only `schemaVersion: 1` reports whose `target` is a
+web address, and answers 400 with the reasons otherwise. A report is identified
+by its site and start time: posting the same one again is acknowledged
+(`"status": "duplicate"`) but stored once.
+
+**/sites** lists each audited site with its latest counts and date. Opening a
+site shows that report grouped as Needs fixing, Worth fixing and Good to know,
+and, compared with the report just before it, what is new and what was fixed.
+Findings are matched by id, so a problem that changes from Worth fixing to
+Needs fixing is still the same problem.
 
 ## Test
 

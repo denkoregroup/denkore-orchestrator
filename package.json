@@ -11,7 +11,7 @@
     "test": "jest",
     "registry:sync": "TS_NODE_PROJECT=scripts/tsconfig.json node --env-file-if-exists=.env.local -r ts-node/register scripts/registry-sync.ts",
     "conductor:simulate": "TS_NODE_PROJECT=scripts/tsconfig.json node --env-file-if-exists=.env.local -r ts-node/register scripts/simulate-step.ts",
-    "audit:run": "TS_NODE_PROJECT=scripts/tsconfig.json node -r ts-node/register scripts/audit-run.ts"
+    "audit:run": "TS_NODE_PROJECT=scripts/tsconfig.json node --env-file-if-exists=.env.local -r ts-node/register scripts/audit-run.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",

@@ -33,7 +33,10 @@ the gate stays `changes_requested` and every new approval is rejected.
 
 **Suggested fix:** Add a CI job that applies `supabase/sql/` to a throwaway
 Postgres (or the Supabase CLI's local stack) and asserts the grants, RLS
-policies, and triggers. Add a Jest test for `updateSession` with a mocked
+policies, and triggers. For `005_audit_reports.sql` the assertions were run
+once by hand against a local Postgres 16 with stand-in roles: the unique key,
+select/insert-only grants for `service_role`, read-only for the owner, and
+nothing for `anon`. Put those in the job. Add a Jest test for `updateSession` with a mocked
 Supabase client: owner allowed, other user and no user redirected, public paths
 open. For gate re-entry, reset the gate to `pending` when the run re-enters the
 gate state (a definer function the runner calls, or a trigger on `runs.state`),
@@ -91,7 +94,7 @@ button, like `/audit`.
 against a local Postgres stand-in. Nothing has been checked against a real
 Supabase project.
 
-**Suggested fix:** After creating the project, applying 001–004 and setting
+**Suggested fix:** After creating the project, applying 001–005 and setting
 the env vars, walk through:
 
 1. `pnpm registry:sync` inserts `example-app`; a second run says `unchanged`.
@@ -110,6 +113,30 @@ the env vars, walk through:
    decided."
 10. As service role, try to insert into `approvals` and update `gates.status`:
     both are refused.
+11. Audit reports (005): in the SQL editor, check the table exists and that
+    `select` works for the owner. Then run
+    `pnpm audit:run --project example-app --post https://<app>/api/audits/report`
+    with the app's `STEP_WEBHOOK_SECRET`. It prints "Report stored in the app".
+12. Run the same command again. Each run has its own start time, so it is a new
+    row. `/sites` shows `example-app`'s site with the newest counts, and its
+    page says what is new and what was fixed since the first run.
+13. Duplicates can't be tried with the CLI (every run has its own start time),
+    so post a saved report twice by hand. Both answers are 200; the first
+    says `"recorded"`, the second `"duplicate"`, and there is still one row:
+
+    ```sh
+    body=$(jq -c '{report: .}' audit-report.json)
+    sig=$(printf %s "$body" | openssl dgst -sha256 -hmac "$STEP_WEBHOOK_SECRET" -hex | sed 's/^.* //')
+    curl -sS -X POST https://<app>/api/audits/report \
+      -H "content-type: application/json" -H "x-denkore-signature: sha256=$sig" \
+      --data-binary "$body"
+    ```
+
+    Change one character of the secret and the answer is 401 with no row.
+14. As service role, try to update and delete an `audit_reports` row: both are
+    refused. Check the row's `project_id` is the `example-app` project.
+15. Sign in as the owner and open `/sites` on a phone-sized screen (360px): the
+    list and the detail page read without sideways scrolling.
 
 ## Reopen a changes-requested gate at the same SHA
 
@@ -168,31 +195,40 @@ failed runs in a row (read through the Actions API with `actions: read`),
 opens or updates one GitHub issue, or sends a message to the owner's
 notification channel. Close the issue on the next green run.
 
-## Audits: store reports and diff runs
+## Audits: stored reports follow-ups
 
-**Why:** `pnpm audit:run` writes a JSON file and forgets it. Nothing keeps
-history, so there is no "new since last week" or "fixed".
+**Why:** Slice 2 stores reports and shows the latest per site, but keeps it
+simple on purpose:
 
-**Suggested fix:** An `audit_runs` table (report JSON, target, project) and
-an `audit_findings` table keyed by finding `id`, written with the secret key
-from a script or route. New, still-open and fixed are then set operations on
-ids between two runs.
+- **Latest per site reads the 1000 newest reports.** PostgREST can't pick the
+  newest row per group, so `/sites` reads the newest 1000 report summaries and
+  keeps the first per site. It says so on the page if it hit that limit; a site
+  with nothing recent could then be missing.
+- **No history view.** A report page compares with the report just before it.
+  There is no list of past runs and no comparing any two.
+- **Spelling counts.** A site is its `target` string, so `http://`, `https://`,
+  `www.` and bare versions of one site are separate sites.
+- **Nothing can be deleted.** No role has a delete grant, so a mistaken report
+  stays until someone removes it by hand in the SQL editor. There is no retention
+  rule either.
+- **A repeat is matched on site and start time only.** A second post with the
+  same pair but different findings is acknowledged as a duplicate and dropped.
+- **Counts are taken from the report as sent.** The ingest route doesn't check
+  that `counts` match the findings; the auditor always makes them match.
+
+**Suggested fix:** When a site has many reports, add a view or function that
+returns the newest report per `target` and use it in `listSites`. Add a
+history list to the site page. Decide on a retention rule (and a definer
+function for deleting) when the volume is known.
 
 ## Audits: run on a schedule
 
 **Why:** Audits only run when someone types the command.
 
 **Suggested fix:** A weekly job per registry entry with an `audits` block
-(Vercel Cron or a scheduled GitHub workflow) that runs the audit and stores
-the report. Add the schedule to the registry block when this lands.
-
-## Audits: an owner-facing view
-
-**Why:** The findings are only in a terminal and a JSON file.
-
-**Suggested fix:** An `/audits` page listing each project's latest run,
-grouped by severity, with "new since last run" from the stored diff. The
-messages are already written for the owner.
+(Vercel Cron or a scheduled GitHub workflow) that runs the audit with
+`--post` (slice 2 added it) and stores the report. Add the schedule to the
+registry block when this lands.
 
 ## Audits: model triage
 

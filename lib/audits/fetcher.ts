@@ -22,7 +22,7 @@ import https from "node:https";
 import { isIP, type Socket } from "node:net";
 import tls from "node:tls";
 
-export const USER_AGENT = "DenkoreAudit/1.0 (+https://denkoregroup.com)";
+export const USER_AGENT = "DenkoreAudit/1.0 (+https://www.denkore.com)";
 
 export const FETCH_DEFAULTS = {
   timeoutMs: 10_000,
