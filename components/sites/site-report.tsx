@@ -32,21 +32,25 @@ function PageGroups({ items, host }: { items: Finding[]; host: string }) {
   );
 }
 
+/**
+ * The status line is for the owner, so it never prints: a client PDF must not say "First report for
+ * this site" or "No changes since". The New and Fixed lists under it are findings and do print.
+ */
 function Changes({ current, previous, host }: { current: StoredReport; previous: StoredReport | null; host: string }) {
   if (!previous) {
-    return <p className="text-sm text-muted">First report for this site, so there is nothing to compare it with yet.</p>;
+    return <p className="text-sm text-muted print:hidden">First report for this site, so there is nothing to compare it with yet.</p>;
   }
   const { newFindings, stillOpen, fixed } = diffReports(previous.report, current.report);
   if (newFindings.length === 0 && fixed.length === 0) {
     return (
-      <p className="text-sm text-muted">
+      <p className="text-sm text-muted print:hidden">
         No changes since <EtTime iso={previous.startedAt} /> · {stillOpen.length} still open.
       </p>
     );
   }
   return (
     <>
-      <p className="text-sm text-muted">
+      <p className="text-sm text-muted print:hidden">
         Since <EtTime iso={previous.startedAt} />: {newFindings.length} new · {fixed.length} fixed · {stillOpen.length} still open.
       </p>
       {newFindings.length > 0 && (
