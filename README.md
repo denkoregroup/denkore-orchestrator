@@ -11,7 +11,7 @@ Single user: only the Supabase Auth user in `DENKORE_OWNER_USER_ID` can sign in.
 
 | Path | What it is |
 | --- | --- |
-| `app/` | Next.js App Router: `/prompt` (start a run), `/runs` and `/runs/[id]`, `/approvals` (decide gates), `/audit`, `/sites` (stored audit reports), login, webhook and the audit report ingest route |
+| `app/` | Next.js App Router: `/prompt` (start a run), `/runs` and `/runs/[id]`, `/approvals` (decide gates), `/activity` (the event log; `/audit` redirects here), `/sites` (stored audit reports), login, webhook and the audit report ingest route |
 | `proxy.ts` | Refreshes the Supabase session and redirects anyone but the owner to `/login` |
 | `lib/data/` | Data access layer for pages and actions: checks the owner, then queries as the user (RLS applies); rows parsed with zod |
 | `lib/approvals/` | Gate card types, the `gateReview` schema, approval mode, decision rules |
