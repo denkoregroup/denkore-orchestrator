@@ -9,6 +9,13 @@ const createClient = jest.fn();
 
 jest.mock("@/lib/auth", () => ({ requireOwner: () => requireOwner() }));
 jest.mock("@/lib/supabase/server", () => ({ createClient: () => createClient() }));
+// Two registered sites (registry entries with an audits block) and one without.
+const registry = new Map<string, { id: string; audits?: { url: string } }>([
+  ["denkore-com", { id: "denkore-com", audits: { url: "https://www.denkore.com" } }],
+  ["ggrmusic-com", { id: "ggrmusic-com", audits: { url: "https://www.ggrmusic.com" } }],
+  ["sample", { id: "sample" }],
+]);
+jest.mock("@/lib/registry/cached", () => ({ getRegistry: async () => registry }));
 
 import { getSiteReport, listSites, SITES_SCAN_LIMIT } from "../queries";
 
@@ -19,6 +26,7 @@ const ID_B1 = "8b3e4d1a-6c5f-4e3a-9d9c-4f7a0b2c3d5e";
 function row(id: string, target: string, startedAt: string, counts = { info: 1, warn: 2, fail: 0 }) {
   return {
     id,
+    project_id: null as string | null,
     target,
     started_at: startedAt,
     finished_at: startedAt,
@@ -43,7 +51,7 @@ beforeEach(() => {
 });
 
 describe.each([
-  ["listSites", () => listSites()],
+  ["listSites", () => listSites(NOW)],
   ["getSiteReport", () => getSiteReport(ID_A1)],
 ])("%s checks the owner first", (_name, call) => {
   it("queries nothing when requireOwner throws", async () => {
@@ -56,23 +64,32 @@ describe.each([
   });
 });
 
+const P_DENKORE = "11111111-1111-4111-8111-111111111111";
+const P_GGR = "22222222-2222-4222-8222-222222222222";
+const DAY = 24 * 3_600_000;
+const NOW = new Date("2026-11-12T12:00:00.000Z");
+const daysAgo = (n: number) => new Date(NOW.getTime() - n * DAY).toISOString();
+
+/** The two tables listSites reads: report summaries (newest first) and the registered projects. */
+function listFake(reports: unknown[], projects: Array<{ id: string; registry_id: string; created_at: string }> = []) {
+  return withFake((q) => ({ data: q.table === "projects" ? projects : reports, error: null }));
+}
+const withProject = (r: ReturnType<typeof row>, project_id: string | null) => ({ ...r, project_id });
+
 describe("listSites", () => {
-  it("is empty before any report is stored", async () => {
-    withFake(() => ({ data: [], error: null }));
-    expect(await listSites()).toEqual({ sites: [], truncated: false });
+  it("is empty before any report is stored and no site is registered yet", async () => {
+    listFake([]);
+    expect(await listSites(NOW)).toEqual({ sites: [], unreported: [], truncated: false });
   });
 
   it("keeps the newest report per site and sorts by address", async () => {
     // Newest first, as the query orders them.
-    withFake(() => ({
-      data: [
-        row(ID_A2, "https://zeta.example/", "2026-11-08T10:00:00+00:00", { info: 0, warn: 0, fail: 1 }),
-        row(ID_B1, "https://alpha.example/", "2026-11-05T10:00:00+00:00"),
-        row(ID_A1, "https://zeta.example/", "2026-11-01T10:00:00+00:00"),
-      ],
-      error: null,
-    }));
-    const { sites, truncated } = await listSites();
+    listFake([
+      withProject(row(ID_A2, "https://zeta.example/", "2026-11-08T10:00:00+00:00", { info: 0, warn: 0, fail: 1 }), null),
+      withProject(row(ID_B1, "https://alpha.example/", "2026-11-05T10:00:00+00:00"), null),
+      withProject(row(ID_A1, "https://zeta.example/", "2026-11-01T10:00:00+00:00"), null),
+    ]);
+    const { sites, truncated } = await listSites(NOW);
     expect(sites.map((s) => [s.target, s.id])).toEqual([
       ["https://alpha.example/", ID_B1],
       ["https://zeta.example/", ID_A2],
@@ -82,29 +99,97 @@ describe("listSites", () => {
   });
 
   it("asks for the newest reports first, without the findings", async () => {
-    const fake = withFake(() => ({ data: [], error: null }));
-    await listSites();
-    expect(argsOf(fake.queries[0], "select")![0]).not.toContain("report");
-    expect(argsOf(fake.queries[0], "order")).toEqual(["started_at", { ascending: false }]);
-    expect(argsOf(fake.queries[0], "limit")).toEqual([SITES_SCAN_LIMIT]);
+    const fake = listFake([]);
+    await listSites(NOW);
+    const reports = fake.queries.find((q) => q.table === "audit_reports")!;
+    expect(argsOf(reports, "select")![0]).not.toContain("report,");
+    expect(argsOf(reports, "select")![0]).toContain("project_id");
+    expect(argsOf(reports, "order")).toEqual(["started_at", { ascending: false }]);
+    expect(argsOf(reports, "limit")).toEqual([SITES_SCAN_LIMIT]);
+  });
+
+  it("looks up the projects of the registered sites only: registry entries with an audits block", async () => {
+    const fake = listFake([]);
+    await listSites(NOW);
+    const projects = fake.queries.find((q) => q.table === "projects")!;
+    expect(argsOf(projects, "in")).toEqual(["registry_id", ["denkore-com", "ggrmusic-com"]]);
+  });
+
+  describe("overdue", () => {
+    const projects = [
+      { id: P_DENKORE, registry_id: "denkore-com", created_at: daysAgo(30) },
+      { id: P_GGR, registry_id: "ggrmusic-com", created_at: daysAgo(30) },
+    ];
+
+    it("marks a registered site whose newest report is more than two days old, and not one that is fresh", async () => {
+      listFake(
+        [
+          withProject(row(ID_A1, "https://www.denkore.com/", daysAgo(1)), P_DENKORE),
+          withProject(row(ID_B1, "https://www.ggrmusic.com/", daysAgo(3)), P_GGR),
+        ],
+        projects,
+      );
+      const { sites } = await listSites(NOW);
+      expect(sites.map((s) => [s.target, s.overdue])).toEqual([
+        ["https://www.denkore.com/", false],
+        ["https://www.ggrmusic.com/", true],
+      ]);
+    });
+
+    it("judges a site by its newest report across all its addresses", async () => {
+      // The newest report is fresh, so the older address of the same project is not overdue either.
+      listFake(
+        [
+          withProject(row(ID_A2, "https://www.denkore.com/", daysAgo(0.5)), P_DENKORE),
+          withProject(row(ID_A1, "https://denkore.com/", daysAgo(5)), P_DENKORE),
+        ],
+        projects,
+      );
+      expect((await listSites(NOW)).sites.map((s) => s.overdue)).toEqual([false, false]);
+    });
+
+    it("never marks a site that is not registered (a prospect posted with --url), however old", async () => {
+      listFake([withProject(row(ID_A1, "https://prospect.example/", daysAgo(40)), null)], projects);
+      expect((await listSites(NOW)).sites[0].overdue).toBe(false);
+    });
+
+    it("lists a registered site with no report at all, overdue only once it has been registered more than two days", async () => {
+      listFake([], [
+        { id: P_DENKORE, registry_id: "denkore-com", created_at: daysAgo(10) },
+        { id: P_GGR, registry_id: "ggrmusic-com", created_at: daysAgo(1) },
+      ]);
+      expect((await listSites(NOW)).unreported).toEqual([
+        { registryId: "denkore-com", overdue: true },
+        { registryId: "ggrmusic-com", overdue: false },
+      ]);
+    });
+
+    it("does not list a site that has a report as unreported", async () => {
+      listFake([withProject(row(ID_A1, "https://www.denkore.com/", daysAgo(1)), P_DENKORE)], projects);
+      expect((await listSites(NOW)).unreported).toEqual([{ registryId: "ggrmusic-com", overdue: true }]);
+    });
   });
 
   it("says so when it read as many reports as it is allowed to", async () => {
-    withFake(() => ({
-      data: Array.from({ length: SITES_SCAN_LIMIT }, (_, i) => row(ID_A1, "https://zeta.example/", `2026-11-01T10:00:${String(i % 60).padStart(2, "0")}+00:00`)),
-      error: null,
-    }));
-    expect((await listSites()).truncated).toBe(true);
+    listFake(
+      Array.from({ length: SITES_SCAN_LIMIT }, (_, i) =>
+        withProject(row(ID_A1, "https://zeta.example/", `2026-11-01T10:00:${String(i % 60).padStart(2, "0")}+00:00`), null),
+      ),
+    );
+    expect((await listSites(NOW)).truncated).toBe(true);
   });
 
   it("fails loudly on an unexpected row shape", async () => {
-    withFake(() => ({ data: [{ ...row(ID_A1, "https://zeta.example/", "2026-11-01T10:00:00+00:00"), warn_count: "many" }], error: null }));
-    await expect(listSites()).rejects.toThrow(/Unexpected audit_reports row shape/);
+    listFake([{ ...withProject(row(ID_A1, "https://zeta.example/", "2026-11-01T10:00:00+00:00"), null), warn_count: "many" }]);
+    await expect(listSites(NOW)).rejects.toThrow(/Unexpected audit_reports row shape/);
   });
 
-  it("throws the database error", async () => {
+  it("throws the database error, from either read", async () => {
     withFake(() => ({ data: null, error: { code: "42501", message: "permission denied for table audit_reports" } }));
-    await expect(listSites()).rejects.toThrow(/listSites failed: permission denied/);
+    await expect(listSites(NOW)).rejects.toThrow(/listSites failed: permission denied/);
+
+    withFake((q) => (q.table === "projects" ? { data: null, error: { message: "timeout" } } : { data: [], error: null }));
+    await expect(listSites(NOW)).rejects.toThrow(/registered sites\) failed: timeout/);
   });
 });
 
