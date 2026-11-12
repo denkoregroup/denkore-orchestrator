@@ -68,9 +68,11 @@ The database is set up by hand; see [Supabase setup](#supabase-setup).
    Supabase only accepts an address on this list and otherwise falls back to the
    Site URL, so a new preview address or port needs an entry first.
 7. Sign in once with the GitHub account whose **verified** email matches the
-   owner's. Supabase links it to the existing owner user. If it creates a new
-   user instead (check Authentication > Users), set `DENKORE_OWNER_USER_ID` to
-   the new id, in Vercel for Production and Preview and in `.env.local`.
+   owner's. Supabase links it to the existing owner user. If the first sign-in
+   fails and the log shows `signup_disabled`, turn on **Allow new users to sign
+   up**, sign in once, then turn it off again. Then check Authentication >
+   Users: if a second user appeared, set `DENKORE_OWNER_USER_ID` (Vercel
+   Production and Preview, and `.env.local`) to its id.
 8. Afterwards you can turn off email and password sign-in in Supabase.
 9. Under **Settings > API Keys > "Publishable and secret API keys"**, copy the
    publishable key into `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` and a secret key
