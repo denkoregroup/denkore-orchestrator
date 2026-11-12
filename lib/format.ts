@@ -10,3 +10,20 @@ export function formatUtc(iso: string): string {
   if (Number.isNaN(date.getTime())) return iso;
   return `${date.toISOString().slice(0, 16).replace("T", " ")} UTC`;
 }
+
+// One shared formatter for every timestamp on the site pages. The zone is explicit, so the string
+// is the same on localhost, on Vercel and in a test, whatever TZ the machine has.
+const EASTERN = new Intl.DateTimeFormat("en-US", {
+  timeZone: "America/New_York",
+  year: "numeric",
+  month: "short",
+  day: "numeric",
+  hour: "numeric",
+  minute: "2-digit",
+  timeZoneName: "shortGeneric",
+});
+
+/** "Nov 8, 2026, 5:00 AM ET" (Eastern time, daylight saving included; the abbreviation is always ET). Throws on a bad date. */
+export function formatEt(iso: string): string {
+  return EASTERN.format(new Date(iso));
+}
