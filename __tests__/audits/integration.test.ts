@@ -202,7 +202,55 @@ describe("a start address that redirects", () => {
       httpProbeUrl: null, // the http:// probe would also land on "/"; leave it out
       fetcher: createFetcher({ allowLocal: true, proxy: null, ca: tls.cert, delayMs: 0 }),
     });
-    expect(secure.hits.filter((h) => h.path === "/")).toHaveLength(1);
+    // The landing page is fetched once as the redirect target, then twice more to measure its
+    // response time. Linking back to it must not queue it a second time (that would be six).
+    expect(secure.hits.filter((h) => h.path === "/")).toHaveLength(3);
+    expect(report.pagesChecked).toBe(2);
+  });
+});
+
+describe("response time is the median of three measurements", () => {
+  /** The nth answer of /page waits delays[n] ms (the last one repeats); "hang" never answers. */
+  async function auditWith(delays: Array<number | "hang">, timeoutMs = 10_000) {
+    // Outside the routes: the fixture helper builds them again for every request.
+    let calls = 0;
+    const { origin, httpOrigin, secure } = await site(
+      (o) => ({
+        "/": pageRoute(o, "/", { body: '<h1>Home</h1><a href="/page">Page</a>' }),
+        "/page": (): Route => {
+          const delay = delays[Math.min(calls++, delays.length - 1)];
+          return delay === "hang" ? { hang: true } : { ...pageRoute(o, "/page"), delayMs: delay };
+        },
+        "/robots.txt": { body: "User-agent: *\nAllow: /\n", headers: { "content-type": "text/plain" } },
+      }),
+      () => ({}),
+    );
+    const report = await runAudit({
+      url: `${origin}/`,
+      httpProbeUrl: `${httpOrigin}/`,
+      fetcher: createFetcher({ allowLocal: true, proxy: null, ca: tls.cert, delayMs: 0, timeoutMs }),
+    });
+    return { report, secure, slowFindings: report.findings.filter((f) => f.check === "page.slow" && f.url === `${origin}/page`) };
+  }
+
+  it("measures every page three times, one after another", async () => {
+    const { secure } = await auditWith([0]);
+    expect(secure.hits.filter((h) => h.path === "/page")).toHaveLength(3);
+  });
+
+  it("slow, fast, fast: no finding", async () => {
+    expect((await auditWith([1200, 0, 0])).slowFindings).toEqual([]);
+  });
+
+  it("slow, slow, fast: one finding, valued at the median", async () => {
+    const { slowFindings } = await auditWith([1200, 1300, 0]);
+    expect(slowFindings).toHaveLength(1);
+    expect(slowFindings[0].evidence).toMatch(/^1[23]\d\d ms to first byte \(median of 3\)$/);
+  });
+
+  it("a repeat that fails leaves the page unjudged, even when its first answer was slow", async () => {
+    const { slowFindings, report } = await auditWith([1200, "hang"], 400);
+    expect(slowFindings).toEqual([]);
     expect(report.pagesChecked).toBe(2);
   });
 });
