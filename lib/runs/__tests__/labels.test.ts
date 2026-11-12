@@ -47,3 +47,13 @@ describe("eventDescription and actorLabel", () => {
     expect(actorLabel("custom-bot")).toBe("custom-bot");
   });
 });
+
+describe("the overdue-audit event", () => {
+  it("reads as a sentence on the Activity page, naming the site", () => {
+    expect(eventDescription("audit.overdue", { registryId: "denkore-com", lastReportAt: null })).toBe("Audit overdue: no new report for denkore-com in over 2 days");
+    expect(eventKindLabel("audit.overdue")).toBe("A site hasn’t been audited on schedule");
+  });
+  it("falls back to the kind label when the payload names no site", () => {
+    expect(eventDescription("audit.overdue", {})).toBe("A site hasn’t been audited on schedule");
+  });
+});

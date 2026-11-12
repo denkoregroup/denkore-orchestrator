@@ -50,6 +50,7 @@ const EVENT_KIND_LABELS: Record<string, string> = {
   "conductor.escalated": "Needs your attention",
   "conductor.step_timed_out": "A step didn’t report back in time and was stopped",
   "conductor.transition_rejected": "A move was refused",
+  "audit.overdue": "A site hasn’t been audited on schedule",
 };
 
 /** Plain-language label for known event kinds; the raw kind otherwise. */
@@ -68,6 +69,10 @@ export function eventDescription(kind: string, payload: unknown): string {
   if (kind === "conductor.escalated" && payload && typeof payload === "object" && "reason" in payload) {
     const reason = (payload as { reason: unknown }).reason;
     if (typeof reason === "string" && reason) return `Needs your attention: ${reason}`;
+  }
+  if (kind === "audit.overdue" && payload && typeof payload === "object" && "registryId" in payload) {
+    const site = (payload as { registryId: unknown }).registryId;
+    if (typeof site === "string" && site) return `Audit overdue: no new report for ${site} in over 2 days`;
   }
   return eventKindLabel(kind);
 }

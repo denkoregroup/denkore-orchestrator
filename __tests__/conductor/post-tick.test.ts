@@ -17,6 +17,7 @@ import { createTickHandler } from "@/lib/conductor/tick";
 import { loadRegistry } from "@/lib/registry/loader";
 import { GitHubActionsRunner } from "@/lib/step-runner/github-actions";
 import { EXAMPLE_REGISTRY_DIR } from "@/test-utils/registry";
+import { quietWatchdog } from "@/test-utils/watchdog";
 
 jest.setTimeout(30_000);
 
@@ -80,6 +81,7 @@ async function conductor() {
     secret: SECRET,
     listActiveRunIds: (n) => store.listActiveRunIds(n),
     advance: (id) => advanceRun(id, deps),
+    watchdog: quietWatchdog,
   });
   return { store, runId, hung, handler };
 }

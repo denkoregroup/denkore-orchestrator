@@ -19,6 +19,7 @@ import { GitHubActionsRunner } from "@/lib/step-runner/github-actions";
 import { sign, SIGNATURE_HEADER } from "@/lib/webhooks/signature";
 import { createStepCompleteHandler } from "@/lib/webhooks/step-complete";
 import { EXAMPLE_REGISTRY_DIR } from "@/test-utils/registry";
+import { quietWatchdog } from "@/test-utils/watchdog";
 
 const SECRET = "test-secret-not-real";
 
@@ -48,7 +49,7 @@ it("a run whose build step never completes times out, retries, then escalates", 
     }),
     onRecorded: () => {},
   });
-  const tick = createTickHandler({ secret: SECRET, listActiveRunIds: (n) => store.listActiveRunIds(n), advance });
+  const tick = createTickHandler({ secret: SECRET, listActiveRunIds: (n) => store.listActiveRunIds(n), advance, watchdog: quietWatchdog });
   const signed = (url: string, body: string) =>
     new Request(url, { method: "POST", headers: { [SIGNATURE_HEADER]: sign(body, SECRET) }, body });
 
