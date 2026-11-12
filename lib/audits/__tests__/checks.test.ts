@@ -247,11 +247,19 @@ describe("page.broken-link and site.start", () => {
 });
 
 describe("a homepage that never answers", () => {
-  it("reports only that it doesn't load, nothing it didn't check", () => {
+  it("reports only that the site is unreachable (Worth fixing), nothing it didn't check", () => {
     const crawl = crawlOf({ pages: [{ url: HOME, facts: null, fetch: fetched(HOME, { status: null, headers: {}, error: { kind: "network", message: "ENOTFOUND" } }) }] });
     crawl.homepageResponded = false;
     crawl.site = { httpVersion: null, altHost: null, robots: null, sitemaps: [], sitemapUrls: [] };
-    expect(keys(runChecks(crawl))).toEqual(["site.start:fail"]);
+    const found = runChecks(crawl);
+    expect(keys(found)).toEqual(["site.unreachable:warn"]);
+    expect(found[0].message).toMatch(/^Site unreachable: .*ENOTFOUND/);
+    expect(found[0].url).toBe(HOME);
+  });
+  it("is a different finding from a homepage that answers with an error", () => {
+    const crawl = crawlOf({ pages: [page(HOME, "", { status: 503 })] });
+    expect(keys(runChecks(crawl))).toContain("site.start:fail");
+    expect(keys(runChecks(crawl))).not.toContain("site.unreachable:warn");
   });
 });
 

@@ -78,7 +78,8 @@ describe("private addresses", () => {
   it("the audit reports a refused local target as a homepage that doesn't load, and fetches nothing else", async () => {
     const site = await serve({ "/": { body: cleanHtml() } });
     const report = await runAudit({ url: `${site.origin}/`, fetcher: createFetcher({ proxy: null, delayMs: 0 }) });
-    expect(report.findings.map((f) => f.check)).toEqual(["site.start"]);
+    expect(report.findings.map((f) => f.check)).toEqual(["site.unreachable"]);
+    expect(report.findings[0].severity).toBe("warn");
     expect(site.hits).toHaveLength(0);
   });
 });
