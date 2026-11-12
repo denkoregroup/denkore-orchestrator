@@ -1,6 +1,7 @@
 import { render, screen, within } from "@testing-library/react";
 import type { StoredReport, SiteSummary } from "@/lib/site-health/queries";
-import { auditReport, findings } from "@/test-utils/site-reports";
+import { finding } from "@/lib/audits/types";
+import { auditReport, DENKORE_TARGET, denkoreFindings, findings } from "@/test-utils/site-reports";
 import { SiteList } from "../site-list";
 import { SiteReport } from "../site-report";
 
@@ -32,6 +33,7 @@ describe("SiteList", () => {
     expect(link).toHaveAttribute("href", `/sites/${ID}`);
     expect(within(link).getByText("www.example.com")).toBeVisible();
     expect(within(link).getByText("1 page", { exact: false })).toBeVisible();
+    expect(within(link).getByText("Nov 8, 2026, 5:00 AM ET", { exact: false })).toBeVisible();
     expect(within(link).getByText("Needs fixing").nextSibling).toHaveTextContent("2");
     expect(within(link).getByText("Worth fixing").nextSibling).toHaveTextContent("3");
     expect(within(link).getByText("Good to know").nextSibling).toHaveTextContent("9");
@@ -45,60 +47,132 @@ describe("SiteList", () => {
   });
 });
 
+const FIRST = "2026-11-01T10:00:00.000Z"; // Nov 1, 2026, 5:00 AM ET
+const LATER = "2026-11-08T10:00:00.000Z";
+
+function denkoreReport(startedAt = LATER, list = denkoreFindings()): StoredReport {
+  const report = auditReport(list, { target: DENKORE_TARGET, startedAt, finishedAt: startedAt });
+  return { id: ID, target: DENKORE_TARGET, startedAt, pagesChecked: 1, report };
+}
+
+const section = (name: RegExp) => screen.getByRole("heading", { level: 2, name }).closest("section")!;
+
 describe("SiteReport", () => {
-  it("groups findings as Needs fixing, Worth fixing and Good to know, each with message and address", () => {
-    render(<SiteReport current={stored([findings.brokenLink, findings.noTitle, findings.noRobots])} previous={null} />);
-    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("example.com");
+  describe("layout", () => {
+    it("has a one-line summary under the host, and the host as the one link to the site", () => {
+      render(<SiteReport current={denkoreReport()} previous={null} />);
+      expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("www.denkore.com");
+      expect(screen.getByText("2 worth fixing · 9 good to know")).toBeVisible();
+      expect(screen.getAllByRole("link", { name: "www.denkore.com" })).toHaveLength(1);
+      expect(screen.getByRole("link", { name: "www.denkore.com" })).toHaveAttribute("href", DENKORE_TARGET);
+    });
 
-    const fail = screen.getByRole("heading", { name: "Needs fixing (1)" }).closest("section")!;
-    expect(within(fail).getByText(findings.brokenLink.message)).toBeVisible();
-    expect(within(fail).getByText(findings.brokenLink.url)).toBeVisible();
-    expect(within(screen.getByRole("heading", { name: "Worth fixing (1)" }).closest("section")!).getByText(findings.noTitle.message)).toBeVisible();
-    expect(within(screen.getByRole("heading", { name: "Good to know (1)" }).closest("section")!).getByText(findings.noRobots.message)).toBeVisible();
+    it("shows nine findings on one page under that page's address once, and the collapsed group still holds all nine", () => {
+      const { container } = render(<SiteReport current={denkoreReport()} previous={null} />);
+      const details = container.querySelector("details")!;
+      expect(details).not.toHaveAttribute("open");
+      expect(within(details).getByText("Good to know (9)")).toBeInTheDocument();
+
+      // The address appears once, as a small heading; the findings are short lines beneath it.
+      expect(within(details).getAllByRole("heading", { level: 3 })).toHaveLength(1);
+      expect(within(details).getByRole("heading", { level: 3 })).toHaveTextContent("/");
+      expect(within(details).getAllByRole("listitem")).toHaveLength(9);
+      // Collapsed means hidden from view, not missing from the page.
+      for (const li of within(details).getAllByRole("listitem", { hidden: true })) expect(li).not.toBeVisible();
+      expect(details.textContent).toContain("HSTS");
+      expect(details.textContent).toContain("og:image");
+    });
+
+    it("keeps Worth fixing open (not in a disclosure) and Good to know the only collapsed group", () => {
+      const { container } = render(<SiteReport current={denkoreReport()} previous={null} />);
+      expect(container.querySelectorAll("details")).toHaveLength(1);
+      const worth = section(/Worth fixing/);
+      expect(worth.closest("details")).toBeNull();
+      expect(worth).toBeVisible();
+      expect(within(worth).getAllByRole("heading", { level: 3 })).toHaveLength(2); // "/" and "/sitemap.xml"
+    });
+
+    it("keeps Needs fixing open too", () => {
+      const { container } = render(<SiteReport current={stored([findings.brokenLink])} previous={null} />);
+      expect(container.querySelector("details")).toBeNull();
+      expect(section(/Needs fixing/)).toBeVisible();
+    });
+
+    it("shows each address as its path, with the full address as the link", () => {
+      render(<SiteReport current={denkoreReport()} previous={null} />);
+      const sitemap = screen.getByRole("link", { name: "/sitemap.xml" });
+      expect(sitemap).toHaveAttribute("href", "https://www.denkore.com/sitemap.xml");
+      expect(screen.queryByText("https://www.denkore.com/sitemap.xml")).toBeNull();
+    });
+
+    it("keeps the host on an address that is on another host", () => {
+      const other = finding({ check: "site.www", severity: "warn", url: "https://denkore.com/", message: "Your site loads at two addresses." });
+      render(<SiteReport current={denkoreReport(LATER, [other])} previous={null} />);
+      expect(screen.getByRole("link", { name: "denkore.com/" })).toHaveAttribute("href", "https://denkore.com/");
+    });
+
+    it("never makes a link out of an address that is not a web address", () => {
+      const bad = finding({ check: "page.broken-link", severity: "fail", url: "javascript:alert(1)", message: "A link is broken." });
+      render(<SiteReport current={denkoreReport(LATER, [bad])} previous={null} />);
+      expect(screen.getByRole("heading", { level: 3 })).toHaveTextContent("javascript:alert(1)");
+      expect(within(screen.getByRole("heading", { level: 3 })).queryByRole("link")).toBeNull();
+    });
+
+    it("says when there is nothing wrong", () => {
+      render(<SiteReport current={denkoreReport(LATER, [])} previous={null} />);
+      expect(screen.getByText("No problems found")).toBeVisible();
+      expect(screen.queryByRole("heading", { level: 2 })).toBeNull();
+    });
+
+    it("shows the check time in Eastern time", () => {
+      render(<SiteReport current={denkoreReport()} previous={null} />);
+      expect(screen.getByText(/Checked/)).toHaveTextContent("Checked Nov 8, 2026, 5:00 AM ET · 1 page looked at");
+    });
+
+    it("links back to all sites", () => {
+      render(<SiteReport current={denkoreReport()} previous={null} />);
+      expect(screen.getByRole("link", { name: "All sites" })).toHaveAttribute("href", "/sites");
+    });
   });
 
-  it("leaves out a group with nothing in it", () => {
-    render(<SiteReport current={stored([findings.noTitle])} previous={null} />);
-    expect(screen.queryByRole("heading", { name: /Needs fixing/ })).toBeNull();
-    expect(screen.queryByRole("heading", { name: /Good to know/ })).toBeNull();
-  });
+  describe("what changed", () => {
+    it("for a first report, says there is nothing to compare", () => {
+      render(<SiteReport current={denkoreReport()} previous={null} />);
+      expect(screen.getByText(/First report for this site/)).toBeVisible();
+    });
 
-  it("says so when there is nothing wrong", () => {
-    render(<SiteReport current={stored([])} previous={null} />);
-    expect(screen.getByText("No problems found.")).toBeVisible();
-  });
+    it("when nothing changed, is one line: no changes since the time, and how many are still open", () => {
+      const { container } = render(<SiteReport current={denkoreReport(LATER)} previous={denkoreReport(FIRST)} />);
+      const lines = screen.getAllByText(/No changes since/);
+      expect(lines).toHaveLength(1);
+      expect(lines[0]).toHaveTextContent("No changes since Nov 1, 2026, 5:00 AM ET · 11 still open.");
+      // Nothing else says so, and no New or Fixed lists are drawn.
+      expect(container.textContent).not.toMatch(/Nothing has changed|Compared with|0 new|0 fixed/);
+      expect(screen.queryByRole("heading", { name: /^New/ })).toBeNull();
+      expect(screen.queryByRole("heading", { name: /^Fixed/ })).toBeNull();
+    });
 
-  it("does not turn an address from a report into a link", () => {
-    render(<SiteReport current={stored([findings.brokenLink])} previous={null} />);
-    expect(screen.queryByRole("link", { name: findings.brokenLink.url })).toBeNull();
-  });
+    it("shows New and Fixed only when their counts are above zero", () => {
+      const previous = denkoreReport(FIRST, [findings.noTitle, findings.noRobots]);
+      const current = denkoreReport(LATER, [findings.noTitle, findings.brokenLink]);
+      render(<SiteReport current={current} previous={previous} />);
 
-  it("for a first report, says there is nothing to compare", () => {
-    render(<SiteReport current={stored()} previous={null} />);
-    expect(screen.getByText(/first report for this site/)).toBeVisible();
-    expect(screen.queryByText(/Nothing has changed/)).toBeNull();
-  });
+      // The time is its own element, so find the line by its own words, then read all of it.
+      expect(screen.getByText(/1 new · 1 fixed · 1 still open/)).toHaveTextContent("Since Nov 1, 2026, 5:00 AM ET: 1 new · 1 fixed · 1 still open.");
+      expect(within(section(/^New \(1\)/)).getByText(findings.brokenLink.message)).toBeVisible();
+      expect(within(section(/^Fixed \(1\)/)).getByText(findings.noRobots.message)).toBeVisible();
+    });
 
-  it("shows what is new and what was fixed since the previous report", () => {
-    const previous = stored([findings.noTitle, findings.noRobots], "2026-11-01T10:00:00.000Z");
-    const current = stored([findings.noTitle, findings.brokenLink]);
-    render(<SiteReport current={current} previous={previous} />);
+    it("shows only New when nothing was fixed", () => {
+      render(<SiteReport current={denkoreReport(LATER, [findings.noTitle, findings.brokenLink])} previous={denkoreReport(FIRST, [findings.noTitle])} />);
+      expect(screen.getByRole("heading", { name: "New (1)" })).toBeVisible();
+      expect(screen.queryByRole("heading", { name: /^Fixed/ })).toBeNull();
+    });
 
-    expect(screen.getByText(/1 new, 1 fixed, 1 still open/)).toBeVisible();
-    const added = screen.getByRole("heading", { name: "New since then (1)" }).nextElementSibling as HTMLElement;
-    expect(within(added).getByText(findings.brokenLink.message)).toBeVisible();
-    const fixed = screen.getByRole("heading", { name: "Fixed since then (1)" }).nextElementSibling as HTMLElement;
-    expect(within(fixed).getByText(findings.noRobots.message)).toBeVisible();
-  });
-
-  it("says nothing has changed when the two reports match", () => {
-    render(<SiteReport current={stored()} previous={stored([findings.noTitle], "2026-11-01T10:00:00.000Z")} />);
-    expect(screen.getByText("Nothing has changed.")).toBeVisible();
-    expect(screen.queryByRole("heading", { name: /since then/ })).toBeNull();
-  });
-
-  it("links back to all sites", () => {
-    render(<SiteReport current={stored()} previous={null} />);
-    expect(screen.getByRole("link", { name: "All sites" })).toHaveAttribute("href", "/sites");
+    it("shows only Fixed when nothing is new", () => {
+      render(<SiteReport current={denkoreReport(LATER, [findings.noTitle])} previous={denkoreReport(FIRST, [findings.noTitle, findings.noRobots])} />);
+      expect(screen.getByRole("heading", { name: "Fixed (1)" })).toBeVisible();
+      expect(screen.queryByRole("heading", { name: /^New/ })).toBeNull();
+    });
   });
 });

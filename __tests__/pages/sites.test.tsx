@@ -60,7 +60,7 @@ describe("/sites/[id]", () => {
     render(await SitePage(params(ID)));
     expect(getSiteReport).toHaveBeenCalledWith(ID);
     expect(screen.getByRole("heading", { name: "Needs fixing (1)" })).toBeVisible();
-    expect(screen.getByRole("heading", { name: "New since then (1)" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "New (1)" })).toBeVisible();
   });
 
   it("without a report for that id, shows not found", async () => {

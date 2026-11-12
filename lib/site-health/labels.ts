@@ -17,3 +17,13 @@ export function siteName(target: string): string {
 export function pagesLabel(count: number): string {
   return count === 1 ? "1 page" : `${count} pages`;
 }
+
+/** "2 worth fixing · 9 good to know": the non-empty groups of a report, worst first. */
+export function summaryLine(counts: { fail: number; warn: number; info: number }): string {
+  const parts = [
+    counts.fail > 0 ? (counts.fail === 1 ? "1 needs fixing" : `${counts.fail} need fixing`) : null,
+    counts.warn > 0 ? `${counts.warn} worth fixing` : null,
+    counts.info > 0 ? `${counts.info} good to know` : null,
+  ].filter((part): part is string => part !== null);
+  return parts.length > 0 ? parts.join(" · ") : "No problems found";
+}
