@@ -15,7 +15,7 @@ import { checkRedirects } from "../checks/redirects";
 import { checkRobots } from "../checks/robots";
 import { checkSecurityHeaders } from "../checks/security-headers";
 import { checkSitemap } from "../checks/sitemap";
-import { checkSpeed } from "../checks/speed";
+import { checkSpeed, medianMs } from "../checks/speed";
 import { checkTitle } from "../checks/title";
 import { checkViewport } from "../checks/viewport";
 import { checkWww } from "../checks/www";
@@ -161,7 +161,7 @@ describe("site.redirects", () => {
   it("reports a redirect to another site, keyed by that host", () => {
     const moved = `${SITE}/moved`;
     const crawl = crawlOf({
-      pages: [page(HOME, cleanHtml()), { url: moved, facts: null, fetch: fetched(moved, { status: 301, error: { kind: "cross_host_redirect", message: "x", location: "https://elsewhere.example/" } }) }],
+      pages: [page(HOME, cleanHtml()), { url: moved, facts: null, ttfbSamplesMs: [], fetch: fetched(moved, { status: 301, error: { kind: "cross_host_redirect", message: "x", location: "https://elsewhere.example/" } }) }],
     });
     const [f] = checkRedirects(crawl);
     expect(f).toMatchObject({ check: "site.redirects", severity: "warn", url: moved });
@@ -212,7 +212,7 @@ describe("site.sitemap", () => {
   it("warns on listed URLs on another site and listed pages that don't load", () => {
     const gone = `${SITE}/gone`;
     const crawl = crawlOf({
-      pages: [page(HOME, cleanHtml()), { url: gone, facts: null, fetch: fetched(gone, { status: 404 }) }],
+      pages: [page(HOME, cleanHtml()), { url: gone, facts: null, ttfbSamplesMs: [], fetch: fetched(gone, { status: 404 }) }],
       site: { sitemapUrls: [HOME, gone, "https://other.example/page"] },
     });
     const findings = checkSitemap(crawl);
@@ -225,7 +225,7 @@ describe("page.broken-link and site.start", () => {
   it("fails a linked page that returns 404, naming the pages that link to it", () => {
     const missing = `${SITE}/missing`;
     const crawl = crawlOf({
-      pages: [page(HOME, cleanHtml()), { url: missing, facts: null, fetch: fetched(missing, { status: 404 }) }],
+      pages: [page(HOME, cleanHtml()), { url: missing, facts: null, ttfbSamplesMs: [], fetch: fetched(missing, { status: 404 }) }],
       linkedFrom: { [missing]: [HOME, `${SITE}/menu`] },
     });
     const [f] = checkLinks(crawl);
@@ -233,13 +233,13 @@ describe("page.broken-link and site.start", () => {
     expect(f.evidence).toBe(`Linked from: ${HOME}, ${SITE}/menu`);
   });
   it("fails a homepage that doesn't load", () => {
-    const crawl = crawlOf({ pages: [{ url: HOME, facts: null, fetch: fetched(HOME, { status: 500 }) }] });
+    const crawl = crawlOf({ pages: [{ url: HOME, facts: null, ttfbSamplesMs: [], fetch: fetched(HOME, { status: 500 }) }] });
     expect(keys(checkLinks(crawl))).toEqual(["site.start:fail"]);
   });
   it("warns on a linked page that times out", () => {
     const slow = `${SITE}/slow`;
     const crawl = crawlOf({
-      pages: [page(HOME, cleanHtml()), { url: slow, facts: null, fetch: fetched(slow, { status: null, error: { kind: "timeout", message: "t" } }) }],
+      pages: [page(HOME, cleanHtml()), { url: slow, facts: null, ttfbSamplesMs: [], fetch: fetched(slow, { status: null, error: { kind: "timeout", message: "t" } }) }],
       linkedFrom: { [slow]: [HOME] },
     });
     expect(keys(checkLinks(crawl))).toEqual(["page.unreachable:warn"]);
@@ -248,7 +248,7 @@ describe("page.broken-link and site.start", () => {
 
 describe("a homepage that never answers", () => {
   it("reports only that the site is unreachable (Worth fixing), nothing it didn't check", () => {
-    const crawl = crawlOf({ pages: [{ url: HOME, facts: null, fetch: fetched(HOME, { status: null, headers: {}, error: { kind: "network", message: "ENOTFOUND" } }) }] });
+    const crawl = crawlOf({ pages: [{ url: HOME, facts: null, ttfbSamplesMs: [], fetch: fetched(HOME, { status: null, headers: {}, error: { kind: "network", message: "ENOTFOUND" } }) }] });
     crawl.homepageResponded = false;
     crawl.site = { httpVersion: null, altHost: null, robots: null, sitemaps: [], sitemapUrls: [] };
     const found = runChecks(crawl);
@@ -286,5 +286,51 @@ describe("page.slow", () => {
   });
   it("keeps the same id whether it is info or warn", () => {
     expect(speed(1500)[0].id).toBe(speed(4000)[0].id);
+  });
+  it("keeps the finding id it always had", () => {
+    expect(speed(1500)[0].id).toBe(fingerprint("page.slow", HOME, ""));
+  });
+
+  describe("judges the median of three measurements", () => {
+    const samples = (...ttfbSamplesMs: number[]) => checkSpeed(crawlOf({ pages: [page(HOME, cleanHtml(), {}, ttfbSamplesMs)] }));
+
+    it("slow, fast, fast: no finding", () => {
+      expect(samples(2500, 80, 90)).toEqual([]);
+    });
+    it("slow, slow, fast: one finding, valued at the median", () => {
+      const found = samples(2500, 2600, 90);
+      expect(keys(found)).toEqual(["page.slow:info"]);
+      expect(found[0].evidence).toBe("2500 ms to first byte (median of 3)");
+      expect(found[0].message).toContain("2.5 seconds");
+    });
+    it("does not depend on the order the measurements came in", () => {
+      expect(samples(90, 2500, 2600)).toEqual(samples(2600, 90, 2500));
+      expect(keys(samples(90, 2500, 2600))).toEqual(["page.slow:info"]);
+      expect(samples(90, 80, 2500)).toEqual([]);
+    });
+    it("fast, slow, slow is a finding too: the first measurement has no special say", () => {
+      expect(keys(samples(90, 2500, 2600))).toEqual(["page.slow:info"]);
+    });
+    it("uses the existing thresholds on the median: 1s is quiet, above 3s warns", () => {
+      expect(samples(1000, 1000, 5000)).toEqual([]);
+      expect(keys(samples(1001, 1001, 50))).toEqual(["page.slow:info"]);
+      expect(keys(samples(3001, 4000, 50))).toEqual(["page.slow:warn"]);
+    });
+    it("has the same id whatever the samples were", () => {
+      expect(samples(2500, 2600, 90)[0].id).toBe(samples(1100, 1200, 5000)[0].id);
+    });
+    it("judges nothing when a measurement is missing (the page failed, or a repeat did)", () => {
+      expect(samples()).toEqual([]);
+      expect(samples(5000)).toEqual([]);
+      expect(samples(5000, 5000)).toEqual([]);
+    });
+  });
+});
+
+describe("medianMs", () => {
+  it("is the middle value", () => {
+    expect(medianMs([3, 1, 2])).toBe(2);
+    expect(medianMs([5])).toBe(5);
+    expect(medianMs([10, 10, 99])).toBe(10);
   });
 });

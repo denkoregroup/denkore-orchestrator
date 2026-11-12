@@ -1,7 +1,7 @@
 import { isIP } from "node:net";
 import { isSameSite, type Fetcher, type FetchResult, USER_AGENT } from "./fetcher";
 import { extractFacts } from "./html";
-import type { CrawlResult, PageResult, SitemapFetch } from "./model";
+import { TTFB_SAMPLES, type CrawlResult, type PageResult, type SitemapFetch } from "./model";
 import { isAllowed, parseRobots, type Robots } from "./robots";
 import { parseSitemap } from "./sitemap";
 import { compareStrings } from "./types";
@@ -69,7 +69,7 @@ export async function crawl(options: CrawlOptions): Promise<CrawlResult> {
       target: target.toString(),
       homepageResponded: false,
       site: { httpVersion: null, altHost: null, robots: null, sitemaps: [], sitemapUrls: [] },
-      pages: [{ url: target.toString(), fetch: start, facts: null }],
+      pages: [{ url: target.toString(), fetch: start, ttfbSamplesMs: [], facts: null }],
       linkedFrom: {},
     };
   }
@@ -137,9 +137,24 @@ export async function crawl(options: CrawlOptions): Promise<CrawlResult> {
     queue.push(key);
   };
 
-  const record = (url: string, fetch: FetchResult) => {
+  /**
+   * The page's own fetch is the first measurement of its time to first byte; the same request is
+   * repeated, one after another, for the rest. One slow answer then can't decide the finding.
+   */
+  const measureTtfb = async (url: string, first: FetchResult): Promise<number[]> => {
+    if (first.error || first.ttfbMs === null) return [];
+    const samples = [first.ttfbMs];
+    while (samples.length < TTFB_SAMPLES) {
+      const again = await fetcher.fetch(url);
+      if (again.error || again.ttfbMs === null) break; // a failed repeat leaves too few to judge
+      samples.push(again.ttfbMs);
+    }
+    return samples;
+  };
+
+  const record = async (url: string, fetch: FetchResult) => {
     const loaded = fetch.status === 200 && !fetch.error && isHtml(fetch) && isSameSite(target, new URL(fetch.finalUrl));
-    const result: PageResult = { url, fetch, facts: loaded ? extractFacts(fetch.body) : null };
+    const result: PageResult = { url, fetch, ttfbSamplesMs: await measureTtfb(url, fetch), facts: loaded ? extractFacts(fetch.body) : null };
     pages.push(result);
     // A page that redirected (e.g. the apex to www) is already read at its
     // final address; don't queue that address again when a link points to it.
@@ -154,14 +169,14 @@ export async function crawl(options: CrawlOptions): Promise<CrawlResult> {
     }
   };
 
-  record(target.toString(), start);
+  await record(target.toString(), start);
   for (const loc of sitemapUrls) {
     const url = resolveLink(loc, base.toString());
     if (url) enqueue(url);
   }
   while (queue.length > 0 && pages.length < maxPages) {
     const url = queue.shift()!;
-    record(url, await fetcher.fetch(url));
+    await record(url, await fetcher.fetch(url));
   }
 
   return {
