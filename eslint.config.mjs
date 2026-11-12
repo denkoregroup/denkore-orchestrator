@@ -37,8 +37,8 @@ const auditBoundaries = [
     },
   },
   {
-    // The audit CLI: lib/audits and lib/registry, plus node:* built-ins for files and paths.
-    files: ["scripts/audit-run.ts"],
+    // The audit CLIs: lib/audits and lib/registry, plus node:* built-ins for files and paths.
+    files: ["scripts/audit-run.ts", "scripts/audit-schedule.ts"],
     rules: {
       "no-restricted-imports": [
         "error",
@@ -46,7 +46,7 @@ const auditBoundaries = [
           patterns: [
             {
               regex: String.raw`^(?!(?:node:|\.\./lib/(?:audits|registry)/(?!.*\.\.)))`,
-              message: "scripts/audit-run.ts may import only lib/audits, lib/registry and node:* built-ins.",
+              message: "The audit scripts may import only lib/audits, lib/registry and node:* built-ins.",
             },
           ],
         },
