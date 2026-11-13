@@ -24,6 +24,31 @@
   --color-muted: var(--muted);
   --color-border: var(--border);
   --color-accent: var(--accent);
+
+  /* The site check page (see .site-check below). */
+  --font-heading: var(--font-bricolage), ui-sans-serif, system-ui, sans-serif;
+  --font-copy: var(--font-source-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-eyebrow: var(--font-jetbrains-mono), ui-monospace, monospace;
+  --color-check-bg: var(--check-bg);
+  --color-check-card: var(--check-card);
+  --color-check-ink: var(--check-ink);
+  --color-check-muted: var(--check-muted);
+  --color-check-line: var(--check-line);
+  --color-check-red: var(--check-red);
+  --color-check-amber: var(--check-amber);
+  --color-check-green: var(--check-green);
+}
+
+/* The site check is flat: a dark screen, and light ink on white paper. No glows, shadows or gradients. */
+.site-check {
+  --check-bg: #050505;
+  --check-card: #181818;
+  --check-ink: #f2efe8;
+  --check-muted: #a8a298;
+  --check-line: #34322e;
+  --check-red: #ff7a7a;
+  --check-amber: #f6b13a;
+  --check-green: #4fd18b;
 }
 
 body {
@@ -52,6 +77,17 @@ body {
     --muted: #4b5563;
     --border: #d1d5db;
     --accent: #b45309;
+  }
+
+  .site-check {
+    --check-bg: #ffffff;
+    --check-card: #ffffff;
+    --check-ink: #14110d;
+    --check-muted: #5a554d;
+    --check-line: #cfc9bf;
+    --check-red: #b3261e;
+    --check-amber: #8a4f00;
+    --check-green: #1f6b3f;
   }
 
   /* A closed <details> hides its content from the page, and from print too, unless told otherwise. */
