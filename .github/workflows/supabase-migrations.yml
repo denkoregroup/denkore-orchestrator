@@ -46,5 +46,6 @@ jobs:
       # Prints what would be applied and changes nothing, so the log shows it before the push.
       - name: List pending migrations
         run: pnpm exec supabase db push --dry-run --remote
+      # --yes: a hosted change asks for confirmation in CLI 3.1.0, and nobody is here to answer.
       - name: Apply pending migrations
-        run: pnpm exec supabase db push --remote
+        run: pnpm exec supabase db push --remote --yes

@@ -57,6 +57,13 @@ describe("supabase-migrations workflow", () => {
     expect(runs.some((r) => r!.includes('supabase link --project-ref "$SUPABASE_PROJECT_REF"'))).toBe(true);
   });
 
+  it("answers the hosted-change prompt with --yes on the apply step only, and leaves the dry run as it was", () => {
+    const runs = steps.map((s) => s.run).filter(Boolean);
+    expect(runs).toContain("pnpm exec supabase db push --dry-run --remote");
+    expect(runs).toContain("pnpm exec supabase db push --remote --yes");
+    expect(runs.filter((r) => r!.includes("--yes"))).toEqual(["pnpm exec supabase db push --remote --yes"]);
+  });
+
   it("never pushes seed data or roles to production", () => {
     expect(raw).not.toMatch(/--include-seed|--include-roles|--include-all/);
   });
