@@ -144,11 +144,14 @@ the env vars, walk through:
     address is missing from the Redirect URLs allowlist (README, one-time
     setup, Sign in with GitHub). Also try the Cancel button on GitHub's prompt:
     `/login` should show "Sign-in didn't complete. Try again."
-17. Daily audits: set the repository variable `AUDIT_REPORT_URL` and check the
+17. Print a report: open a report on `/sites`, choose Print > Save as PDF. The
+    PDF has no nav, no header or sign-out, every finding including Good to know,
+    and reads in dark ink on white even from a browser in dark mode.
+18. Daily audits: set the repository variable `AUDIT_REPORT_URL` and check the
     secret `STEP_WEBHOOK_SECRET` (README, one-time setup, GitHub Actions). In the Actions tab run
     "Audit schedule" by hand. It goes green, and `/sites` shows a report from
     minutes ago for denkore.com, ggrmusic.com and dclarkdev.com.
-18. Watchdog: after a few days of daily runs, `/sites` shows no Overdue badge.
+19. Watchdog: after a few days of daily runs, `/sites` shows no Overdue badge.
     To see it act, disable the "Audit schedule" workflow for three days, then
     check `/sites` (Overdue) and Activity ("Audit overdue: no new report for
     <site> in over 2 days"). The tick's answer in the Actions log lists the same
@@ -306,6 +309,16 @@ opened.
 **Suggested fix:** Use `formatEt` (or a `LocalTime` built on it) everywhere, and
 drop the UTC-then-local switch. Decide first whether Eastern is right for every
 page, or whether it should be a setting.
+
+## Hide the accepted-findings group when printing
+
+**Why:** The printable report (the print stylesheet in `app/globals.css`) hides
+the nav, header, sign-out and the "All sites" link, but the issue also asks
+that an accepted-findings group stays out of a client's PDF. That group does not
+exist yet, so nothing hides it.
+
+**Suggested fix:** When accepted findings land, give that group `print:hidden`
+and extend `__tests__/print/print.test.tsx`.
 
 ## Daily audits: follow-ups
 

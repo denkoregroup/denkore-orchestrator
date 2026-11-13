@@ -37,3 +37,33 @@ body {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
+
+/* Printing (Save as PDF) gives a document you could hand to a client. The app chrome (nav, header,
+   sign-out) is hidden with print:hidden in the layout. Here: always the light palette, and every
+   <details> printed open, so the PDF is complete. */
+@page {
+  margin: 16mm;
+}
+
+@media print {
+  :root {
+    --background: #ffffff;
+    --foreground: #171717;
+    --muted: #4b5563;
+    --border: #d1d5db;
+    --accent: #b45309;
+  }
+
+  /* A closed <details> hides its content from the page, and from print too, unless told otherwise. */
+  details::details-content {
+    content-visibility: visible;
+    display: block;
+  }
+
+  details > summary {
+    list-style: none;
+  }
+  details > summary::-webkit-details-marker {
+    display: none;
+  }
+}
