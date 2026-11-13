@@ -71,21 +71,39 @@ describe("supabase/seed.sql", () => {
     expect(seed.match(new RegExp(OWNER, "g"))!.length).toBeGreaterThanOrEqual(3);
   });
 
-  it("seeds two reports for one target that the app's own schema accepts, with matching counts", () => {
-    const reports = [...seed.matchAll(/\$json\$([\s\S]*?)\$json\$/g)].map((m) => auditReportSchema.parse(JSON.parse(m[1])));
-    expect(reports).toHaveLength(2);
-    expect(new Set(reports.map((r) => r.target)).size).toBe(1);
-    for (const r of reports) {
+  const reports = () => [...seed.matchAll(/\$json\$([\s\S]*?)\$json\$/g)].map((m) => auditReportSchema.parse(JSON.parse(m[1])));
+
+  it("seeds reports the app's own schema accepts, with matching counts", () => {
+    expect(reports()).toHaveLength(3);
+    for (const r of reports()) {
       for (const s of ["info", "warn", "fail"] as const) expect(r.counts[s]).toBe(r.findings.filter((f) => f.severity === s).length);
     }
-    const [older, newer] = reports;
+  });
+
+  it("uses only the auditor's real check ids", () => {
+    const seen = new Set(reports().flatMap((r) => r.findings.map((f) => f.check)));
+    expect([...seen].sort()).toEqual(["page.broken-link", "page.description", "page.title", "site.security-headers"]);
+  });
+
+  it("gives two reports for one made-up prospect a diff with something new, fixed and still open", () => {
+    const [older, newer] = reports();
+    expect(older.target).toBe(newer.target);
     expect(older.startedAt < newer.startedAt).toBe(true);
     const olderIds = new Set(older.findings.map((f) => f.id));
     const newerIds = new Set(newer.findings.map((f) => f.id));
-    // Something new, something fixed, something still open: the diff has all three to show.
     expect(newer.findings.some((f) => !olderIds.has(f.id))).toBe(true);
     expect(older.findings.some((f) => !newerIds.has(f.id))).toBe(true);
     expect(newer.findings.some((f) => olderIds.has(f.id))).toBe(true);
+  });
+
+  it("links exactly one report, for a different site, to the seeded project", () => {
+    const [older, newer, linked] = reports();
+    expect(new Set([older.target, newer.target, linked.target]).size).toBe(2);
+    const projectId = "d3c0de00-0000-4000-8000-000000000002";
+    expect(seed).toContain(`insert into public.projects (id, registry_id, repo, owner_id) values (\n  '${projectId}'`);
+    // The report rows in order: null, null, then the project.
+    const projectColumn = [...seed.slice(seed.indexOf("insert into public.audit_reports")).matchAll(/^\) values \(\n\s+(null|'[0-9a-f-]{36}'),|^\), \(\n\s+(null|'[0-9a-f-]{36}'),/gm)].map((m) => m[1] ?? m[2]);
+    expect(projectColumn).toEqual(["null", "null", `'${projectId}'`]);
   });
 });
 

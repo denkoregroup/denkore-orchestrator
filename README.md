@@ -24,7 +24,7 @@ pnpm db:reset   # applies supabase/migrations, then supabase/seed.sql; wipes loc
 pnpm db:stop
 ```
 
-Put the local block from `.env.example` in `.env.local`. The seed creates the owner (the id in that block) and a demo site with two reports, so `/sites` shows a diff.
+Put the local block from `.env.example` in `.env.local`. The seed creates the owner (the id in that block) and demo reports (one made-up site with two, so `/sites` shows a diff, and one more linked to a project the owner owns).
 
 **One-time: a GitHub OAuth app for local.** Make a second one, separate from production: GitHub > Settings > Developer settings > OAuth Apps > New, homepage `http://localhost:3000`, callback `http://127.0.0.1:54321/auth/v1/callback`. Put its client ID and a generated secret in `supabase/.env` (git-ignored) as `GITHUB_LOCAL_CLIENT_ID` and `GITHUB_LOCAL_SECRET`, then restart with `pnpm db:stop && pnpm db:start`.
 

@@ -40,9 +40,11 @@ insert into public.projects (id, registry_id, repo, owner_id) values (
   'd3c0de00-0000-4000-8000-000000000001'
 );
 
--- Two reports for one target, a day apart, so /sites has a diff to show:
--- the description finding is fixed, the title finding is still open, and a
--- broken link is new. Counts match the findings.
+-- Two reports for one made-up prospect (no project), a day apart, so the report page has a diff to
+-- show: the missing description is fixed, the long title and the missing HSTS setting are still open,
+-- and a broken link is new. A third report is for a site linked to the project above, so a registered
+-- site shows up too. Check ids, severities and wording are the auditor's own (lib/audits/checks), and
+-- each finding id is the auditor's fingerprint of its check, page and key. Counts match the findings.
 insert into public.audit_reports (
   project_id, target, started_at, finished_at, pages_checked,
   info_count, warn_count, fail_count, report
@@ -58,9 +60,9 @@ insert into public.audit_reports (
     "finishedAt": "2026-11-11T10:00:09.000Z",
     "pagesChecked": 3,
     "findings": [
-      {"id": "0a1b2c3d4e5f6071", "check": "page.title", "severity": "warn", "url": "https://seed-demo.example.test/about", "message": "This page's title is too long and may be cut off in search results."},
-      {"id": "1b2c3d4e5f607182", "check": "page.description", "severity": "warn", "url": "https://seed-demo.example.test/", "message": "This page has no description. Search engines will pick their own snippet."},
-      {"id": "2c3d4e5f60718293", "check": "headers.hsts", "severity": "info", "url": "https://seed-demo.example.test/", "message": "Missing Strict-Transport-Security header."}
+      {"id": "123a7f5972a269f5", "check": "page.title", "severity": "warn", "url": "https://seed-demo.example.test/about", "message": "This page's title is long (72 characters), so Google will cut it off. Keep it to 60 characters or fewer.", "evidence": "About Seed Demo Co: family-run plumbing, heating and drain cleaning since 1994"},
+      {"id": "4fa92b82543be881", "check": "page.description", "severity": "warn", "url": "https://seed-demo.example.test/", "message": "This page has no description. Google often shows the description under your link in search results, so write one or two sentences about the page."},
+      {"id": "83eea488dbb241f6", "check": "site.security-headers", "severity": "info", "url": "https://seed-demo.example.test/", "message": "Your server doesn't tell browsers to always use the secure version of your site (the HSTS setting). Your web host can turn this on."}
     ],
     "counts": {"info": 1, "warn": 2, "fail": 0}
   }$json$::jsonb
@@ -76,10 +78,28 @@ insert into public.audit_reports (
     "finishedAt": "2026-11-12T10:00:08.000Z",
     "pagesChecked": 3,
     "findings": [
-      {"id": "0a1b2c3d4e5f6071", "check": "page.title", "severity": "warn", "url": "https://seed-demo.example.test/about", "message": "This page's title is too long and may be cut off in search results."},
-      {"id": "2c3d4e5f60718293", "check": "headers.hsts", "severity": "info", "url": "https://seed-demo.example.test/", "message": "Missing Strict-Transport-Security header."},
-      {"id": "3d4e5f6071829304", "check": "links.broken", "severity": "fail", "url": "https://seed-demo.example.test/contact", "message": "A link on this page leads to a page that doesn't exist.", "evidence": "/old-pricing returned 404"}
+      {"id": "41d646d36c847326", "check": "page.broken-link", "severity": "fail", "url": "https://seed-demo.example.test/old-pricing", "message": "A link on your site goes to a page that doesn't work (status 404). Fix or remove the link.", "evidence": "Linked from: https://seed-demo.example.test/contact"},
+      {"id": "123a7f5972a269f5", "check": "page.title", "severity": "warn", "url": "https://seed-demo.example.test/about", "message": "This page's title is long (72 characters), so Google will cut it off. Keep it to 60 characters or fewer.", "evidence": "About Seed Demo Co: family-run plumbing, heating and drain cleaning since 1994"},
+      {"id": "83eea488dbb241f6", "check": "site.security-headers", "severity": "info", "url": "https://seed-demo.example.test/", "message": "Your server doesn't tell browsers to always use the secure version of your site (the HSTS setting). Your web host can turn this on."}
     ],
     "counts": {"info": 1, "warn": 1, "fail": 1}
+  }$json$::jsonb
+), (
+  'd3c0de00-0000-4000-8000-000000000002',
+  'https://seed-site.example.test/',
+  '2026-11-12T11:00:00Z', '2026-11-12T11:00:07Z', 2,
+  1, 2, 0,
+  $json${
+    "schemaVersion": 1,
+    "target": "https://seed-site.example.test/",
+    "startedAt": "2026-11-12T11:00:00.000Z",
+    "finishedAt": "2026-11-12T11:00:07.000Z",
+    "pagesChecked": 2,
+    "findings": [
+      {"id": "f5dd1f6bbc1361e5", "check": "page.description", "severity": "warn", "url": "https://seed-site.example.test/", "message": "This page has no description. Google often shows the description under your link in search results, so write one or two sentences about the page."},
+      {"id": "4c65c1a2b4f9bcf0", "check": "page.title", "severity": "warn", "url": "https://seed-site.example.test/contact", "message": "This page's title is very short (4 characters). Describe the page in 10 to 60 characters, for example your business name and what the page is about.", "evidence": "Home"},
+      {"id": "b375820e9c4bee66", "check": "site.security-headers", "severity": "info", "url": "https://seed-site.example.test/", "message": "Your server doesn't tell browsers to always use the secure version of your site (the HSTS setting). Your web host can turn this on."}
+    ],
+    "counts": {"info": 1, "warn": 2, "fail": 0}
   }$json$::jsonb
 );
