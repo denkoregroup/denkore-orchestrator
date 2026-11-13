@@ -65,6 +65,11 @@ describe("the stored denkore.com report", () => {
 
   it("puts open graph, the sitemap and the description first, and never the optional security settings", () => {
     expect(summary.topFixes).toEqual([FIXES["page.open-graph"], FIXES["site.sitemap"], FIXES["page.description"]]);
+    expect(summary.topFixes.map((x) => x.title)).toEqual(["Add link previews", "Give Google a map of your site", "Fix your search description"]);
+    expect(summary.topFixes[2]).toEqual({
+      title: "Fix your search description",
+      outcome: "It's the line Google shows under your name, so it should say what you do in 160 characters or fewer.",
+    });
     expect(summary.topFixes[0]).toEqual({
       title: "Add link previews",
       outcome: "Shared links show your picture, name and a line about you instead of a blank box.",
@@ -142,8 +147,49 @@ describe("a site without HTTPS", () => {
     expect(summarizeForProspect(insecure).topFixes).toEqual([FIXES["site.https"]]);
   });
 
-  it("is red for any site.https finding, even the informational one", () => {
-    expect(lights(report([f("site.https", "info", "http://denkore.com/", "http-unreachable")])).safety).toBe("red");
+});
+
+describe("a site whose plain address doesn't load (info-only site.https)", () => {
+  const plain = report([f("site.https", "info", "http://denkore.com/", "http-unreachable")]);
+  const s = summarizeForProspect(plain);
+
+  it("is safety amber, not red", () => {
+    expect(s.areas.find((a) => a.id === "safety")).toEqual({
+      id: "safety",
+      title: "Safety",
+      light: "amber",
+      status: "Needs work",
+      why: "Your site is secure, but typing your address without “https://” doesn't always reach it.",
+    });
+  });
+
+  it("keeps the secure clause, adds the amber phrase, and never gets the not-secure headline", () => {
+    expect(s.supporting).toBe("It loads, and it's secure. But typing your plain address doesn't always reach it.");
+    expect(s.headline).toEqual({ before: "Good site, a few ", light: "easy wins", after: "." });
+    expect(headline(plain)).not.toContain("not secure");
+  });
+
+  it("offers the generic https fix", () => {
+    expect(s.topFixes).toEqual([
+      {
+        title: "Send every visitor to the secure version of your site",
+        outcome: "No one lands on an insecure page or sees a “Not secure” warning.",
+      },
+    ]);
+  });
+
+  it("goes red, with the not-secure headline, as soon as any site.https finding fails", () => {
+    const both = report([f("site.https", "info", "http://denkore.com/", "http-unreachable"), f("site.https", "fail", "http://denkore.com/", "no-redirect")]);
+    expect(lights(both).safety).toBe("red");
+    expect(headline(both)).toBe("Your site shows as not secure.");
+    expect(summarizeForProspect(both).supporting).toBe("It loads.");
+  });
+
+  it("joins the amber phrase last, after the other areas", () => {
+    const more = report([f("page.description", "warn"), f("site.https", "info", "http://denkore.com/", "http-unreachable")]);
+    expect(summarizeForProspect(more).supporting).toBe(
+      "It loads, and it's secure. But Google is missing a few details and typing your plain address doesn't always reach it.",
+    );
   });
 });
 
@@ -196,7 +242,7 @@ describe("light rules at their boundaries", () => {
     expect(lights(report([slow("info"), f("page.slow", "warn", "https://denkore.com/a")])).speed).toBe("red");
   });
 
-  it("safety: only site.https turns it red", () => {
+  it("safety: only site.https affects it, and only a failing one turns it red", () => {
     expect(lights(report([f("site.security-headers", "info", TARGET, "a"), f("site.security-headers", "info", TARGET, "b")])).safety).toBe("green");
   });
 });

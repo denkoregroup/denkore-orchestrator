@@ -30,11 +30,13 @@ export const AREA_COPY = {
       green: "Your pages start loading quickly.",
     },
   },
-  // No amber: Safety is red or green. The optional line shows when only the optional settings are missing.
+  // Red: the site is not secure. Amber: it is, but the plain address doesn't always reach it. The
+  // optional line shows when only the optional settings are missing.
   safety: {
     title: "Safety",
     why: {
       red: "Browsers show your visitors a “Not secure” warning.",
+      amber: "Your site is secure, but typing your address without “https://” doesn't always reach it.",
       green: "Your site uses a secure connection.",
       greenWithOptionalSettings: "Your site uses a secure connection. A few optional settings could make it safer still.",
     },
@@ -67,6 +69,7 @@ export const SUPPORTING = {
     sharingPartlyMissing: "shared links are missing details",
     google: "Google is missing a few details",
     speed: "it's slow to start loading",
+    safetyAmber: "typing your plain address doesn't always reach it",
   },
 } as const;
 
@@ -77,16 +80,16 @@ export const FIXES = {
     outcome: "Shared links show your picture, name and a line about you instead of a blank box.",
   },
   "site.https": {
-    title: "Switch your site to a secure connection",
-    outcome: "Visitors stop seeing a “Not secure” warning, and your site earns more trust.",
+    title: "Send every visitor to the secure version of your site",
+    outcome: "No one lands on an insecure page or sees a “Not secure” warning.",
   },
   "site.sitemap": {
     title: "Give Google a map of your site",
     outcome: "A sitemap helps Google find every page you add, not just the homepage.",
   },
   "page.description": {
-    title: "Add a description to your pages",
-    outcome: "Google can show a short line about you under your name in search results.",
+    title: "Fix your search description",
+    outcome: "It's the line Google shows under your name, so it should say what you do in 160 characters or fewer.",
   },
   "page.title": {
     title: "Give every page a clear title",

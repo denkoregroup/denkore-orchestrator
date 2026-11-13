@@ -90,6 +90,7 @@ export function summarizeForProspect(report: AuditReport): ProspectSummary {
   const google = inArea("google");
   const speed = inArea("speed");
   const safetyFindings = inArea("safety");
+  const httpsFindings = safetyFindings.filter((f) => f.check === "site.https");
 
   // The homepage is the page the audit started from, whose address is the report's target.
   const homepage = normalizeUrl(report.target);
@@ -100,17 +101,17 @@ export function summarizeForProspect(report: AuditReport): ProspectSummary {
     sharing: sharingAllMissing ? "red" : sharing.length > 0 ? "amber" : "green",
     google: count(google, "fail") > 0 ? "red" : count(google, "warn") > 0 || count(google, "info") >= 2 ? "amber" : "green",
     speed: speed.some((f) => f.severity !== "info") ? "red" : speed.length > 0 ? "amber" : "green",
-    safety: safetyFindings.some((f) => f.check === "site.https") ? "red" : "green",
+    safety: httpsFindings.some((f) => f.severity === "fail") ? "red" : httpsFindings.length > 0 ? "amber" : "green",
   };
 
-  const optionalSettings = safetyFindings.length > 0; // only site.security-headers can be left when safety is green
+  const optionalSettings = safetyFindings.length > 0; // when safety is green, only site.security-headers can be left
   const whys: Record<AreaId, string> = {
     sharing: AREA_COPY.sharing.why[lights.sharing],
     google: AREA_COPY.google.why[lights.google],
     speed: AREA_COPY.speed.why[lights.speed],
     safety:
-      lights.safety === "red"
-        ? AREA_COPY.safety.why.red
+      lights.safety !== "green"
+        ? AREA_COPY.safety.why[lights.safety]
         : optionalSettings
           ? AREA_COPY.safety.why.greenWithOptionalSettings
           : AREA_COPY.safety.why.green,
@@ -145,15 +146,16 @@ function headlineFor(lights: Record<AreaId, Light>): ProspectSummary["headline"]
 
 function supportingFor(lights: Record<AreaId, Light>, sharingAllMissing: boolean): string {
   const { phrases } = SUPPORTING;
-  // Safety has no phrase: its problem is the headline's, and it is never amber.
+  // Safety red has no phrase: its problem is the headline's. Safety amber has one.
   const candidates: Array<string | null> = [
     lights.sharing !== "green" ? (sharingAllMissing ? phrases.sharingAllMissing : phrases.sharingPartlyMissing) : null,
     lights.google !== "green" ? phrases.google : null,
     lights.speed !== "green" ? phrases.speed : null,
+    lights.safety === "amber" ? phrases.safetyAmber : null,
   ];
   const problems = candidates.filter((p): p is string => p !== null);
 
-  const first = `${SUPPORTING.loads}${lights.safety === "green" ? SUPPORTING.secure : ""}${SUPPORTING.end}`;
+  const first = `${SUPPORTING.loads}${lights.safety !== "red" ? SUPPORTING.secure : ""}${SUPPORTING.end}`;
   if (problems.length === 0) return first;
   const joined = problems.length === 1 ? problems[0] : `${problems.slice(0, -1).join(", ")} and ${problems[problems.length - 1]}`;
   return `${first}${SUPPORTING.but}${joined}${SUPPORTING.end}`;
