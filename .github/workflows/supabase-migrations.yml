@@ -1,0 +1,50 @@
+name: Supabase migrations
+
+# Deploys the SQL in supabase/migrations to the production database. By hand only:
+# nothing runs on push or merge. Open the Actions tab, pick this workflow, Run workflow.
+# It lists the pending migrations first, then applies them. See the README for the
+# one-time step before the first run.
+#
+# Needs: the secrets SUPABASE_ACCESS_TOKEN and SUPABASE_DB_PASSWORD, and the
+# repository variable SUPABASE_PROJECT_REF.
+
+on:
+  workflow_dispatch:
+
+# Nothing by default. The one job below gets only what checkout needs.
+permissions: {}
+
+concurrency:
+  group: supabase-migrations
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      # The repository is private: checkout needs read access, nothing more.
+      contents: read
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
+        with:
+          version: 10
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Link the production project
+        run: pnpm exec supabase link --project-ref "$SUPABASE_PROJECT_REF"
+      # Prints what would be applied and changes nothing, so the log shows it before the push.
+      - name: List pending migrations
+        run: pnpm exec supabase db push --dry-run --remote
+      - name: Apply pending migrations
+        run: pnpm exec supabase db push --remote
