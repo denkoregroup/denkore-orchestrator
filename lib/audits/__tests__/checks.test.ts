@@ -253,8 +253,19 @@ describe("a homepage that never answers", () => {
     crawl.site = { httpVersion: null, altHost: null, robots: null, sitemaps: [], sitemapUrls: [] };
     const found = runChecks(crawl);
     expect(keys(found)).toEqual(["site.unreachable:warn"]);
-    expect(found[0].message).toMatch(/^Site unreachable: .*ENOTFOUND/);
+    // Plain words for the owner; the technical reason sits in the evidence.
+    expect(found[0].message).toBe(
+      "Site unreachable: we couldn't load your homepage. If this keeps happening, your site may be down or blocking automated visitors.",
+    );
+    expect(found[0].message).not.toContain("ENOTFOUND");
+    expect(found[0].evidence).toBe("Network error: ENOTFOUND");
     expect(found[0].url).toBe(HOME);
+  });
+  it("says \"No answer\" in the evidence when there is no error to quote", () => {
+    const crawl = crawlOf({ pages: [{ url: HOME, facts: null, ttfbSamplesMs: [], fetch: fetched(HOME, { status: null, headers: {}, error: null }) }] });
+    crawl.homepageResponded = false;
+    crawl.site = { httpVersion: null, altHost: null, robots: null, sitemaps: [], sitemapUrls: [] };
+    expect(runChecks(crawl)[0].evidence).toBe("No answer");
   });
   it("is a different finding from a homepage that answers with an error", () => {
     const crawl = crawlOf({ pages: [page(HOME, "", { status: 503 })] });

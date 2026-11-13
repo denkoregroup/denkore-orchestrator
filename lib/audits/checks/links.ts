@@ -19,7 +19,9 @@ export function checkLinks(crawl: CrawlResult): Finding[] {
           check: "site.unreachable",
           severity: "warn",
           url: page.url,
-          message: `Site unreachable: we couldn't load your homepage (${fetch.error ? fetch.error.message : "no answer"}). If this keeps happening, your site may be down or blocking automated visitors.`,
+          message: "Site unreachable: we couldn't load your homepage. If this keeps happening, your site may be down or blocking automated visitors.",
+          // The technical reason goes in evidence, not in the sentence the owner reads.
+          evidence: fetch.error ? `Network error: ${fetch.error.message}` : "No answer",
         }),
       );
       return;
