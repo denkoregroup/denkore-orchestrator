@@ -8,7 +8,6 @@
  * reports back; the clock moves past each deadline and the tick advances it.
  * Set PRINT_TRANSCRIPT=1 to see the run's history.
  */
-import path from "node:path";
 import { advanceRun, ESCALATION_REASONS, type ConductorDeps } from "@/lib/conductor/advance";
 import { STEP_DEADLINE_SECONDS } from "@/lib/conductor/decide";
 import { MemoryConductorStore } from "@/lib/conductor/memory-store";
@@ -19,11 +18,13 @@ import { eventDescription } from "@/lib/runs/labels";
 import { GitHubActionsRunner } from "@/lib/step-runner/github-actions";
 import { sign, SIGNATURE_HEADER } from "@/lib/webhooks/signature";
 import { createStepCompleteHandler } from "@/lib/webhooks/step-complete";
+import { EXAMPLE_REGISTRY_DIR } from "@/test-utils/registry";
+import { quietWatchdog } from "@/test-utils/watchdog";
 
 const SECRET = "test-secret-not-real";
 
 it("a run whose build step never completes times out, retries, then escalates", async () => {
-  const registry = await loadRegistry(path.join(process.cwd(), "registry"));
+  const registry = await loadRegistry(EXAMPLE_REGISTRY_DIR);
   const store = new MemoryConductorStore();
   const deps: ConductorDeps = {
     store,
@@ -48,7 +49,7 @@ it("a run whose build step never completes times out, retries, then escalates", 
     }),
     onRecorded: () => {},
   });
-  const tick = createTickHandler({ secret: SECRET, listActiveRunIds: (n) => store.listActiveRunIds(n), advance });
+  const tick = createTickHandler({ secret: SECRET, listActiveRunIds: (n) => store.listActiveRunIds(n), advance, watchdog: quietWatchdog });
   const signed = (url: string, body: string) =>
     new Request(url, { method: "POST", headers: { [SIGNATURE_HEADER]: sign(body, SECRET) }, body });
 

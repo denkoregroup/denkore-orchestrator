@@ -1,0 +1,29 @@
+# v1 registered site. Confirmed: the id, the audits url. Best guesses, to check before the
+# Conductor builds anything here: repo, hosting and stack. Not an example: the daily audit
+# (.github/workflows/audit-schedule.yml) audits every entry with an audits block.
+id: denkore-com
+repo: dclarktech302/denkore
+gateTier: app
+hosting:
+  provider: unknown
+stack:
+  - web
+design:
+  system: denkore-base
+integrations: []
+phase: maintain
+tracker:
+  provider: github
+  project: dclarktech302/denkore
+backlog: docs/backlog.md
+constraints:
+  - Mobile-first; every flow must work at 360px width.
+gates:
+  oneTap:
+    - spec
+    - design
+  prReview:
+    - release
+criticalFlowsPath: tests/critical-flows
+audits:
+  url: https://www.denkore.com

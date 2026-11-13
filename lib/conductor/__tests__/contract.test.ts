@@ -1,12 +1,12 @@
 /**
  * @jest-environment node
  */
-import path from "node:path";
 import { loadRegistry } from "@/lib/registry/loader";
 import { stepInputSchema, STEP_NAMES } from "@/lib/step-runner/types";
 import { branchFor, buildStepInput, SHIP_AND_LOG_RULE, TOOL_ALLOWLISTS } from "../contract";
 import { DEFAULT_MODEL, MODEL_OVERRIDES, modelFor } from "../defaults";
 import { LIMITS } from "../limits";
+import { EXAMPLE_REGISTRY_DIR } from "@/test-utils/registry";
 
 const RUN = "6f1c2b9e-4a3d-4c1e-9b7a-2d5e8f0a1b3c";
 
@@ -24,7 +24,7 @@ describe("agent contract", () => {
   });
 
   it.each([...STEP_NAMES])("builds a valid step input for %s", async (step) => {
-    const entry = (await loadRegistry(path.join(process.cwd(), "registry"))).get("example-app")!;
+    const entry = (await loadRegistry(EXAMPLE_REGISTRY_DIR)).get("example-app")!;
     const input = buildStepInput({ runId: RUN, step, prompt: "Build the booking page", entry, ownerNote: "Bigger buttons" });
     expect(stepInputSchema.safeParse(input).success).toBe(true);
     expect(input).toMatchObject({ maxTurns: LIMITS.maxTurns, timeoutSeconds: LIMITS.stepTimeoutSeconds, branch: "cast/6f1c2b9e" });
@@ -37,7 +37,7 @@ describe("agent contract", () => {
   it("uses Sonnet by default for every step, from the one place the model is set", async () => {
     expect(DEFAULT_MODEL).toBe("claude-sonnet-5-5");
     expect(MODEL_OVERRIDES).toEqual({});
-    const entry = (await loadRegistry(path.join(process.cwd(), "registry"))).get("example-app")!;
+    const entry = (await loadRegistry(EXAMPLE_REGISTRY_DIR)).get("example-app")!;
     for (const step of STEP_NAMES) {
       const input = buildStepInput({ runId: RUN, step, prompt: "Build the booking page", entry, ownerNote: null });
       expect([step, input.model]).toEqual([step, DEFAULT_MODEL]);

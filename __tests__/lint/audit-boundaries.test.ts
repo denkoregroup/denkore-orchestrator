@@ -45,6 +45,12 @@ describe("lib/audits import boundary", () => {
     expect(restrictedImports("scripts/audit-run.ts", lines(...forbidden, ...allowed)).sort()).toEqual([...forbidden].sort());
   });
 
+  it("limits scripts/audit-schedule.ts the same way", () => {
+    const forbidden = ["../lib/supabase/admin", "../lib/conductor/advance", "../lib/site-health/watchdog", "@/lib/audits/run", "zod"];
+    const allowed = ["../lib/audits/schedule", "../lib/registry/loader", "node:path"];
+    expect(restrictedImports("scripts/audit-schedule.ts", lines(...forbidden, ...allowed)).sort()).toEqual([...forbidden].sort());
+  });
+
   it("exempts audit tests", () => {
     expect(restrictedImports("lib/audits/__tests__/example.test.ts", lines("@/test-utils/audit", "@/lib/supabase/admin"))).toEqual([]);
   });

@@ -97,7 +97,7 @@ Supabase project.
 **Suggested fix:** After creating the project, applying 001–005 and setting
 the env vars, walk through:
 
-1. `pnpm registry:sync` inserts `example-app`; a second run says `unchanged`.
+1. `pnpm registry:sync` inserts `denkore-com`, `ggrmusic-com` and `dclarkdev-com`; a second run says `unchanged`.
 2. Sign in with GitHub as the owner. Another GitHub account is signed straight
    out again and sees "This GitHub account isn't allowed in."
 3. `/prompt`: a 5-character prompt is refused; a real one opens `/runs/[id]`
@@ -116,10 +116,10 @@ the env vars, walk through:
     both are refused.
 11. Audit reports (005): in the SQL editor, check the table exists and that
     `select` works for the owner. Then run
-    `pnpm audit:run --project example-app --post https://<app>/api/audits/report`
+    `pnpm audit:run --project dclarkdev-com --post https://<app>/api/audits/report`
     with the app's `STEP_WEBHOOK_SECRET`. It prints "Report stored in the app".
 12. Run the same command again. Each run has its own start time, so it is a new
-    row. `/sites` shows `example-app`'s site with the newest counts, and its
+    row. `/sites` shows the `dclarkdev-com` site with the newest counts, and its
     page says what is new and what was fixed since the first run.
 13. Duplicates can't be tried with the CLI (every run has its own start time),
     so post a saved report twice by hand. Both answers are 200; the first
@@ -135,7 +135,7 @@ the env vars, walk through:
 
     Change one character of the secret and the answer is 401 with no row.
 14. As service role, try to update and delete an `audit_reports` row: both are
-    refused. Check the row's `project_id` is the `example-app` project.
+    refused. Check the row's `project_id` is the `dclarkdev-com` project.
 15. Sign in as the owner and open `/sites` on a phone-sized screen (360px): the
     list and the detail page read without sideways scrolling.
 16. Sign in with GitHub from each place: on `http://localhost:3000`, on a Vercel
@@ -147,6 +147,15 @@ the env vars, walk through:
 17. Print a report: open a report on `/sites`, choose Print > Save as PDF. The
     PDF has no nav, no header or sign-out, every finding including Good to know,
     and reads in dark ink on white even from a browser in dark mode.
+18. Daily audits: set the repository variable `AUDIT_REPORT_URL` and check the
+    secret `STEP_WEBHOOK_SECRET` (README, one-time setup, GitHub Actions). In the Actions tab run
+    "Audit schedule" by hand. It goes green, and `/sites` shows a report from
+    minutes ago for denkore.com, ggrmusic.com and dclarkdev.com.
+19. Watchdog: after a few days of daily runs, `/sites` shows no Overdue badge.
+    To see it act, disable the "Audit schedule" workflow for three days, then
+    check `/sites` (Overdue) and Activity ("Audit overdue: no new report for
+    <site> in over 2 days"). The tick's answer in the Actions log lists the same
+    sites under `watchdog.overdue`. Re-enable the workflow afterwards.
 
 ## Reopen a changes-requested gate at the same SHA
 
@@ -310,3 +319,28 @@ exist yet, so nothing hides it.
 
 **Suggested fix:** When accepted findings land, give that group `print:hidden`
 and extend `__tests__/print/print.test.tsx`.
+
+## Daily audits: follow-ups
+
+**Why:** The first version of the daily audit leaves these for later:
+
+- **`fixableInCode: false` on the unreachable finding.** The issue asks for it
+  "once that flag exists". It doesn't, so the Site unreachable finding (Worth
+  fixing) has no such field yet.
+- **HoneyBee** joins `registry/` once its store has content.
+- **The registry entries for the three sites hold guesses.** Only the id and the
+  audits url are confirmed; repo, hosting and stack are best guesses (see the
+  comment in each `registry/*.yaml`). Check them before the Conductor builds
+  anything on these projects.
+- **The only alert is a red run and the Overdue badge.** There is no message to
+  you when the daily audit fails or a site is overdue. The tick-alert entry above
+  ("Alert when the tick keeps failing") should cover this workflow too.
+- **An overdue site writes one event per overdue stretch**, not a reminder every
+  day, and that event is only shown on Activity.
+- **Reports are only matched to a site by project.** A report posted with `--url`
+  for a registered site's address is stored without a project, so the watchdog
+  doesn't count it.
+
+**Suggested fix:** Add the flag when it exists, confirm the registry fields, and
+route both failures (the red run, the escalation event) to the notification
+channel once there is one.

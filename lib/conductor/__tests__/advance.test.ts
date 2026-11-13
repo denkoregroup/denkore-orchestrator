@@ -1,7 +1,6 @@
 /**
  * @jest-environment node
  */
-import path from "node:path";
 import { loadRegistry } from "@/lib/registry/loader";
 import type { RegistryEntry } from "@/lib/registry/schema";
 import type { GateKind } from "@/lib/state-machine";
@@ -12,10 +11,11 @@ import { REASONS, STEP_DEADLINE_SECONDS } from "../decide";
 import { DEFAULT_MODEL } from "../defaults";
 import { LIMITS } from "../limits";
 import { MemoryConductorStore } from "../memory-store";
+import { EXAMPLE_REGISTRY_DIR } from "@/test-utils/registry";
 
 let registry: Map<string, RegistryEntry>;
 beforeAll(async () => {
-  registry = await loadRegistry(path.join(process.cwd(), "registry"));
+  registry = await loadRegistry(EXAMPLE_REGISTRY_DIR);
 });
 
 const sha = (n: number) => n.toString(16).padStart(40, "0");

@@ -6,8 +6,9 @@ import os from "node:os";
 import path from "node:path";
 import { stringify } from "yaml";
 import { loadRegistry, parseRegistryEntry, RegistryError } from "..";
+import { EXAMPLE_REGISTRY_DIR } from "@/test-utils/registry";
 
-const REGISTRY_DIR = path.join(__dirname, "..", "..", "..", "registry");
+const REGISTRY_DIR = EXAMPLE_REGISTRY_DIR;
 
 async function exampleObject() {
   return parseRegistryEntry(await readFile(path.join(REGISTRY_DIR, "example-app.yaml"), "utf8"));
@@ -81,5 +82,22 @@ describe("registry audits block", () => {
     const base = await exampleObject();
     expect(() => parseRegistryEntry(stringify({ ...base, audits: { url: "ftp://example.com" } }))).toThrow(RegistryError);
     expect(() => parseRegistryEntry(stringify({ ...base, audits: { url: "https://example.com", ignorePaths: ["admin"] } }))).toThrow(/start with/);
+  });
+});
+
+describe("the v1 registry (registry/*.yaml)", () => {
+  it("is exactly denkore.com, ggrmusic.com and dclarkdev.com, each with an audits block", async () => {
+    const registry = await loadRegistry();
+    expect([...registry.keys()].sort()).toEqual(["dclarkdev-com", "denkore-com", "ggrmusic-com"]);
+    expect([...registry.values()].map((e) => new URL(e.audits!.url).host).sort()).toEqual([
+      "dclarkdev.com",
+      "www.denkore.com",
+      "www.ggrmusic.com",
+    ]);
+  });
+
+  it("does not include denkoregroup.com, which is not a Denkore build", async () => {
+    const registry = await loadRegistry();
+    for (const entry of registry.values()) expect(new URL(entry.audits!.url).host).not.toMatch(/denkoregroup/);
   });
 });

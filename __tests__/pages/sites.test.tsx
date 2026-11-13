@@ -26,7 +26,7 @@ beforeEach(() => {
 
 describe("/sites", () => {
   it("without data, explains that nothing has been sent yet", async () => {
-    listSites.mockResolvedValue({ sites: [], truncated: false });
+    listSites.mockResolvedValue({ sites: [], unreported: [], truncated: false });
     render(await SitesPage());
     expect(screen.getByRole("heading", { level: 1, name: "Sites" })).toBeVisible();
     expect(screen.getByText(/No site reports yet/)).toBeVisible();
@@ -34,7 +34,8 @@ describe("/sites", () => {
 
   it("with data, lists each site", async () => {
     listSites.mockResolvedValue({
-      sites: [{ id: ID, target: "https://example.com/", startedAt: "2026-11-08T10:00:00.000Z", pagesChecked: 3, counts: { fail: 0, warn: 2, info: 4 } }],
+      sites: [{ id: ID, target: "https://example.com/", startedAt: "2026-11-08T10:00:00.000Z", pagesChecked: 3, counts: { fail: 0, warn: 2, info: 4 }, overdue: false }],
+      unreported: [],
       truncated: false,
     });
     render(await SitesPage());

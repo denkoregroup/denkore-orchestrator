@@ -19,6 +19,7 @@ describe("SiteList", () => {
     startedAt: "2026-11-08T10:00:00.000Z",
     pagesChecked: 1,
     counts: { fail: 2, warn: 3, info: 9 },
+    overdue: false,
   };
 
   it("says there are no reports yet, and links nowhere", () => {
@@ -37,6 +38,26 @@ describe("SiteList", () => {
     expect(within(link).getByText("Needs fixing").nextSibling).toHaveTextContent("2");
     expect(within(link).getByText("Worth fixing").nextSibling).toHaveTextContent("3");
     expect(within(link).getByText("Good to know").nextSibling).toHaveTextContent("9");
+  });
+
+  it("marks an overdue site, and only that one", () => {
+    const other: SiteSummary = { ...site, id: "7a2d3c0f-5b4e-4d2f-8c8b-3e6f9a1b2c4d", target: "https://other.example/" };
+    render(<SiteList sites={[{ ...site, overdue: true }, other]} truncated={false} />);
+    const overdueLink = screen.getByRole("link", { name: /www\.example\.com/ });
+    expect(within(overdueLink).getByText("Overdue")).toBeVisible();
+    expect(within(screen.getByRole("link", { name: /other\.example/ })).queryByText("Overdue")).toBeNull();
+    expect(screen.getAllByText("Overdue")).toHaveLength(1);
+  });
+
+  it("lists a registered site that has no report yet, and marks it overdue when it should be", () => {
+    render(<SiteList sites={[]} unreported={[{ registryId: "denkore-com", overdue: true }, { registryId: "ggrmusic-com", overdue: false }]} truncated={false} />);
+    expect(screen.queryByText(/No site reports yet/)).toBeNull();
+    const [first, second] = screen.getAllByRole("listitem");
+    expect(first).toHaveTextContent("denkore-com");
+    expect(within(first).getByText("Overdue")).toBeVisible();
+    expect(within(first).getByText("No report yet.")).toBeVisible();
+    expect(within(second).queryByText("Overdue")).toBeNull();
+    expect(screen.queryByRole("link")).toBeNull();
   });
 
   it("only warns about a partial list when the read was cut off", () => {

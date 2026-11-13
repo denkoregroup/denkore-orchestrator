@@ -1,3 +1,4 @@
+import type { WatchdogResult } from "@/lib/site-health/watchdog";
 import { SIGNATURE_HEADER, verifySignature } from "@/lib/webhooks/signature";
 import type { AdvanceResult } from "./advance";
 import { LIMITS } from "./limits";
@@ -7,6 +8,8 @@ export interface TickDeps {
   secret: string | undefined;
   listActiveRunIds: (limit: number) => Promise<string[]>;
   advance: (runId: string) => Promise<AdvanceResult>;
+  /** The missed-run watchdog for the daily site audits. Runs after the runs are advanced. */
+  watchdog: () => Promise<WatchdogResult>;
 }
 
 function json(body: unknown, status: number) {
@@ -42,7 +45,11 @@ export function createTickHandler(deps: TickDeps) {
         runs.push({ runId, stopped: "error" });
       }
     }
-    // checked: runs looked at; advanced: runs that changed; stepsTimedOut: hung steps failed this tick.
-    return json({ checked: runs.length, advanced, stepsTimedOut, runs }, 200);
+    // Last, so a watchdog failure can't hold back the runs. It is not caught: a tick that can't
+    // run its watchdog answers 500, the workflow shows red, and nobody is told "all quiet" falsely.
+    const watchdog = await deps.watchdog();
+    // checked: runs looked at; advanced: runs that changed; stepsTimedOut: hung steps failed this tick;
+    // watchdog: the daily-audit check (overdue sites, and the ones newly escalated).
+    return json({ checked: runs.length, advanced, stepsTimedOut, runs, watchdog }, 200);
   };
 }
