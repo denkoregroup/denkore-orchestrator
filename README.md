@@ -60,12 +60,13 @@ CI runs typecheck, lint and tests on every pull request.
 
 | Path | What it is |
 | --- | --- |
-| `app/` | Pages (`/prompt`, `/runs`, `/approvals`, `/sites`, `/activity`, `/login`) and the API routes. `/activity` is the event log; `/audit` redirects there |
+| `app/` | Pages (`/prompt`, `/runs`, `/approvals`, `/sites`, `/activity`, `/login`, and `/check/[reportId]`, the site check for a phone and its one-page PDF) and the API routes. `/activity` is the event log; `/audit` redirects there |
 | `proxy.ts` | Refreshes the session and keeps everyone but the owner out |
 | `lib/conductor/` | Decides and applies each run's next step; its limits are in `limits.ts` |
 | `lib/state-machine/` | Run states and allowed moves |
 | `lib/audits/` | The site auditor (CLI: `scripts/audit-run.ts`) |
-| `lib/site-check/` | The prospect site check: four lights, a headline and the top three fixes from one report (all wording in `copy.ts`) |
+| `lib/site-check/` | The prospect site check: four lights, a headline and the top three fixes from one report (all wording, and the booking link, in `copy.ts`) |
+| `components/site-check/` | The site check view and its QR code |
 | `lib/site-health/` | Stored audit reports, what changed between two of them, and the missed-run watchdog the tick runs |
 | `supabase/sql/` | Schema, RLS and triggers, pasted in by hand |
 | `registry/` | One YAML file per project |
