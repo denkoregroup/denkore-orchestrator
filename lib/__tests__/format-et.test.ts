@@ -49,3 +49,11 @@ describe("formatEt", () => {
     expect(() => formatEt("not a date")).toThrow(RangeError);
   });
 });
+
+describe("formatEtDate", () => {
+  it("is the date in Eastern time, so a late-evening report keeps its day", () => {
+    const { formatEtDate } = jest.requireActual("../format") as typeof import("../format");
+    expect(formatEtDate("2026-11-08T10:00:00.000Z")).toBe("Nov 8, 2026");
+    expect(formatEtDate("2026-11-09T03:30:00.000Z")).toBe("Nov 8, 2026");
+  });
+});

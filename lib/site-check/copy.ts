@@ -56,7 +56,7 @@ export const HEADLINES = {
 /** The whole headline is one plain sentence with no light-weight words. */
 export const UNREACHABLE = {
   headline: { before: "We couldn't load your site.", light: "", after: "" },
-  supporting: "We couldn't reach it just now, so there is nothing to rate yet.",
+  supporting: "The site didn't load when we checked. It may be down, or blocking automated visitors.",
 } as const;
 
 export const SUPPORTING = {
@@ -135,4 +135,27 @@ export const FIXES = {
     title: "Send old addresses to the right page",
     outcome: "Anyone who uses an old or alternate address ends up where you want them.",
   },
+} as const;
+
+/** Where "Book a call" goes, and what the QR code on the page and the PDF opens. Empty leaves both out. */
+export const BOOKING_URL = "https://cal.com/dcps302";
+
+/** The words around the report on the phone screen and in the PDF. */
+export const VIEW = {
+  eyebrow: "Site check",
+  atAGlance: "At a glance",
+  fixesHeading: (count: number): string => (count === 1 ? "The fix that matters most" : count === 2 ? "Two fixes that matter most" : "Three fixes that matter most"),
+  helpHeading: "How Denkore can help",
+  helpLine: (count: number): string =>
+    count === 1 ? "It's a quick fix. We can have it done soon." : count === 2 ? "Both are quick fixes. We can have them done soon." : "All three are quick fixes. We can have them done soon.",
+  bookCall: "Book a call",
+  qrLabel: "QR code to book a call",
+  savePdf: "Save as PDF",
+  allFindings: (count: number): string => `See all ${count} ${count === 1 ? "finding" : "findings"}`,
+  checkedHomepage: "homepage",
+  checkedPages: (count: number): string => `${count} pages`,
+  checked: "Checked",
+  findingsOnRequest: (count: number): string => `${count} ${count === 1 ? "finding" : "findings"} in full on request`,
+  signature: "Site check by Denkore · Tech that's not confusing.",
+  back: "All sites",
 } as const;
