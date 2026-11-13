@@ -60,7 +60,8 @@ export function SiteCheckView({ current, bookingUrl = BOOKING_URL }: { current: 
       <header className="space-y-4 print:space-y-2">
         <div className="flex flex-wrap items-center gap-3">
           <p className={EYEBROW}>
-            {VIEW.eyebrow} · <time dateTime={current.startedAt}>{formatEtDate(current.startedAt)}</time>
+            {VIEW.eyebrow} · <span className="hidden print:inline">{siteName(report.target)} · </span>
+            <time dateTime={current.startedAt}>{formatEtDate(current.startedAt)}</time>
           </p>
           <p className="rounded-full border border-check-line px-3 py-1 font-eyebrow text-xs text-check-muted print:hidden">{siteName(report.target)}</p>
         </div>

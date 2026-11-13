@@ -101,7 +101,7 @@ describe("the denkore.com site check", () => {
     render(<SiteCheckView current={denkore()} />);
     expect(screen.getByText(/^Checked/)).toHaveTextContent("Checked Nov 12, 2026, 5:00 AM ET · homepage");
     expect(screen.getByText("Site check by Denkore · Tech that's not confusing.")).toBeVisible();
-    expect(screen.getByText(/^Site check ·/)).toHaveTextContent("Site check · Nov 12, 2026");
+    expect(screen.getByText(/^Site check ·/)).toHaveTextContent("Site check · www.denkore.com · Nov 12, 2026");
     expect(screen.getByText("www.denkore.com")).toBeVisible();
   });
 
@@ -188,6 +188,15 @@ describe("printing (one Letter page)", () => {
     printHidden(screen.getByRole("link", { name: "Book a call" }));
     printHidden(screen.getByRole("button", { name: "Save as PDF" }));
     printHidden(container.querySelector("details"));
+  });
+
+  it("names the website in the printed eyebrow, so the PDF always says which site it is about", () => {
+    render(<SiteCheckView current={denkore()} />);
+    const eyebrow = screen.getByText(/^Site check ·/);
+    const printed = within(eyebrow).getByText("www.denkore.com ·");
+    expect(printed).toHaveClass("hidden", "print:inline"); // on screen the chip says it instead
+    expect(eyebrow).toHaveTextContent("Site check · www.denkore.com · Nov 12, 2026");
+    printHidden(screen.getByText("www.denkore.com")); // the chip itself stays off the page
   });
 
   it("keeps the help panel and the QR code, and puts the areas in a 2 by 2 grid", () => {
