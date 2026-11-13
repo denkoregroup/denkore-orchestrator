@@ -1,7 +1,7 @@
 /**
  * DELIBERATE: the secret-key client (the service_role Postgres role), because
  * the ingest route is a machine caller authenticated by HMAC, not by a user
- * session. 005_audit_reports.sql grants that role select and insert on
+ * session. The audit_reports migration grants that role select and insert on
  * audit_reports and nothing more: it cannot update or delete a stored report.
  */
 import "server-only";
