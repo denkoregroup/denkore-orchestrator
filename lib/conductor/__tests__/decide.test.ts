@@ -48,6 +48,7 @@ function snap(state: RunState, overrides: Partial<RunSnapshot> = {}): RunSnapsho
     gates: [],
     totalCostUsd: 0,
     timedOutStepKeys: [],
+    fix: null,
     ...overrides,
   };
 }
@@ -271,5 +272,59 @@ describe("decide: steps that never report back", () => {
 
   it("an unparseable clock never fails a step", () => {
     expect(decide(snap("build_test", { steps: [dispatched("build_test")] }), "not a time").type).toBe("wait");
+  });
+});
+
+describe("decide: a run made from a site report", () => {
+  const FIX_PROMPT = "[audit-fix]\nFix these audit findings on www.denkore.com.\n- page.title | https://www.denkore.com/ | m";
+  const A = "aaaaaaaaaaaaaaaa";
+  const B = "bbbbbbbbbbbbbbbb";
+  const live = (fix: RunSnapshot["fix"]) => snap("post_deploy_check", { prompt: FIX_PROMPT, fix });
+
+  it("starts at build_test with start_fix, not at the spec", () => {
+    expect(decide(snap("queued", { prompt: FIX_PROMPT, fix: { findingIds: [A], nextReport: null } }), NOW)).toEqual({
+      type: "transition",
+      event: { type: "start_fix" },
+    });
+    expect(decide(snap("queued"), NOW)).toEqual({ type: "transition", event: { type: "start" } });
+  });
+
+  it("waits for a report instead of sending a live-check step", () => {
+    expect(decide(live({ findingIds: [A], nextReport: null }), NOW)).toEqual({ type: "wait", reason: "Waiting for the next audit report." });
+  });
+
+  it("is verified by a report that shows none of its findings", () => {
+    expect(decide(live({ findingIds: [A, B], nextReport: { id: "r1", startedAt: AFTER, findingIds: ["cccccccccccccccc"] } }), NOW)).toEqual({
+      type: "verify_fix",
+      reportId: "r1",
+      reportStartedAt: AFTER,
+    });
+  });
+
+  it("escalates when a report still shows any of its findings", () => {
+    expect(decide(live({ findingIds: [A, B], nextReport: { id: "r1", startedAt: AFTER, findingIds: [B] } }), NOW)).toEqual({
+      type: "escalate",
+      reason: "The next audit report still shows 1 of the 2 findings open.",
+    });
+    expect(decide(live({ findingIds: [A], nextReport: { id: "r1", startedAt: AFTER, findingIds: [A] } }), NOW)).toEqual({
+      type: "escalate",
+      reason: "The next audit report still shows 1 of the 1 finding open.",
+    });
+  });
+
+  it("escalates when the list of findings is missing, even if a report exists", () => {
+    expect(decide(live({ findingIds: null, nextReport: { id: "r1", startedAt: AFTER, findingIds: [] } }), NOW)).toEqual({
+      type: "escalate",
+      reason: REASONS.fixListMissing,
+    });
+  });
+
+  it("never finishes on a succeeded deploy step or a pull request alone", () => {
+    const merged = step("deploy", { prUrl: "https://example.com/pr/1" });
+    expect(decide({ ...live({ findingIds: [A], nextReport: null }), steps: [merged] }, NOW).type).toBe("wait");
+  });
+
+  it("leaves an ordinary run's live check to the runner", () => {
+    expect(decide(snap("post_deploy_check"), NOW)).toMatchObject({ type: "dispatch", step: "post_deploy_check" });
   });
 });

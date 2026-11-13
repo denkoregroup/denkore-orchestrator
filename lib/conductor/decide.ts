@@ -1,7 +1,8 @@
+import { isAuditFixPrompt } from "@/lib/audit-fixes/prompt";
 import { GATE_KIND_BY_STATE, isGateState, isTerminal, type GateKind, type GateState, type RunState } from "@/lib/state-machine";
 import type { StepName } from "@/lib/step-runner/types";
 import { LIMITS } from "./limits";
-import type { ConductorAction, GateSnapshot, RunSnapshot, StepSnapshot } from "./types";
+import type { ConductorAction, FixSnapshot, GateSnapshot, RunSnapshot, StepSnapshot } from "./types";
 
 type WorkState = Extract<RunState, StepName>;
 
@@ -39,6 +40,9 @@ export const REASONS = {
   noChange: (step: StepName) =>
     `The ${STEP_NOUN[step]} was sent back for changes, but no change was produced.`,
   noReviewCommit: "There is no commit for this review.",
+  fixListMissing: "The list of findings for this run is missing, so the next report can't be checked against it.",
+  fixStillOpen: (open: number, total: number) =>
+    `The next audit report still shows ${open} of the ${total} ${total === 1 ? "finding" : "findings"} open.`,
   timedOut: (step: StepName) =>
     `The ${STEP_NOUN[step]} step didn't report back within ${Math.round(STEP_DEADLINE_SECONDS / 60)} minutes.`,
 } as const;
@@ -137,6 +141,19 @@ function decideWork(snapshot: RunSnapshot, step: WorkState, now: string): Conduc
     : onFailed(step, snapshot.timedOutStepKeys.includes(current.stepKey));
 }
 
+/**
+ * The live check for a run made from an audit report is the next audit report: every finding the run was
+ * started for must be gone from it. A merged pull request alone never finishes the run.
+ */
+function decideFixCheck(fix: FixSnapshot): ConductorAction {
+  if (!fix.findingIds) return { type: "escalate", reason: REASONS.fixListMissing };
+  const next = fix.nextReport;
+  if (!next) return { type: "wait", reason: "Waiting for the next audit report." };
+  const stillOpen = fix.findingIds.filter((id) => next.findingIds.includes(id));
+  if (stillOpen.length > 0) return { type: "escalate", reason: REASONS.fixStillOpen(stillOpen.length, fix.findingIds.length) };
+  return { type: "verify_fix", reportId: next.id, reportStartedAt: next.startedAt };
+}
+
 function decideGate(snapshot: RunSnapshot, state: GateState): ConductorAction {
   const kind = GATE_KIND_BY_STATE[state];
   const source = newest(snapshot.steps, (s) => s.step === SOURCE_STEP[state] && s.status === "succeeded" && s.commitSha !== null);
@@ -182,7 +199,9 @@ export function decide(input: RunSnapshot, now: string): ConductorAction {
   if (snapshot.totalCostUsd > LIMITS.maxCostUsd) return { type: "escalate", reason: REASONS.tooExpensive };
   if (snapshot.steps.length > LIMITS.maxStepsPerRun) return { type: "escalate", reason: REASONS.tooManySteps };
 
-  if (state === "queued") return { type: "transition", event: { type: "start" } };
+  // A run made from an audit report has no spec or design stage: the click was its spec gate.
+  if (state === "queued") return { type: "transition", event: { type: isAuditFixPrompt(snapshot.prompt) ? "start_fix" : "start" } };
+  if (state === "post_deploy_check" && snapshot.fix) return decideFixCheck(snapshot.fix);
   if (isWorkState(state)) return decideWork(snapshot, state, now);
   if (isGateState(state)) return decideGate(snapshot, state);
   return { type: "wait", reason: `Nothing to do in ${state}.` };

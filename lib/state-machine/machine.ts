@@ -17,6 +17,8 @@ export interface RunContext {
 
 export type RunEvent =
   | { type: "start" }
+  /** A run made from an audit report: the owner's click was its spec gate, so it goes straight to build and test. */
+  | { type: "start_fix" }
   | { type: "spec_ready"; commitSha: string }
   | { type: "design_ready"; commitSha: string }
   | { type: "tests_passed" }
@@ -102,7 +104,9 @@ export function transition(run: RunContext, event: RunEvent): TransitionResult {
 
   switch (run.state) {
     case "queued":
-      return event.type === "start" ? moveTo(run, "spec") : reject(run, event);
+      if (event.type === "start") return moveTo(run, "spec");
+      if (event.type === "start_fix") return moveTo(run, "build_test");
+      return reject(run, event);
     case "spec":
       return event.type === "spec_ready"
         ? enterGate(run, "spec_gate", event.commitSha)

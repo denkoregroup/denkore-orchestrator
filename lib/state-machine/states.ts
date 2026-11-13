@@ -33,7 +33,8 @@ const ABORTABLE: RunState[] = ["failed", "cancelled", "escalated"];
  * Terminal states have no outgoing transitions.
  */
 export const ALLOWED_TRANSITIONS: Readonly<Record<RunState, readonly RunState[]>> = {
-  queued: ["spec", ...ABORTABLE],
+  // A run made from an audit report starts at build_test: the click is its spec, and it has no design.
+  queued: ["spec", "build_test", ...ABORTABLE],
   spec: ["spec_gate", ...ABORTABLE],
   // Approve moves forward; request-changes sends the run back to the step before the gate.
   spec_gate: ["design", "spec", ...ABORTABLE],
