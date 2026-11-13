@@ -3,6 +3,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { EventList } from "@/components/event-list";
 import { LocalTime } from "@/components/local-time";
+import { EtTime } from "@/components/sites/et-time";
+import { FIX } from "@/lib/audit-fixes/copy";
+import { FIX_VERIFIED_EVENT, isAuditFixPrompt } from "@/lib/audit-fixes/prompt";
 import { getRun } from "@/lib/data/runs";
 import { formatUsd } from "@/lib/format";
 import { NEEDS_OWNER_STATES, runStateLabel, STEP_LABELS, STEP_STATUS_LABELS } from "@/lib/runs/labels";
@@ -15,6 +18,9 @@ export default async function RunPage(props: PageProps<"/runs/[id]">) {
   if (!detail) notFound();
   const { run, project, steps, events, costUsd } = detail;
   const needsYou = NEEDS_OWNER_STATES.includes(run.state);
+  // A run made from a site report is verified by a later report alone, never by its pull request.
+  const verified = events.find((e) => e.kind === FIX_VERIFIED_EVENT);
+  const verifiedPayload = verified?.payload as { report_id?: string; report_started_at?: string } | undefined;
 
   return (
     <article className="mx-auto max-w-2xl space-y-6">
@@ -26,6 +32,21 @@ export default async function RunPage(props: PageProps<"/runs/[id]">) {
         </p>
         <h1 className="text-xl font-semibold">{project?.registry_id ?? "Unknown project"}</h1>
         <p className={needsYou ? "font-semibold text-accent" : ""}>{runStateLabel(run.state)}</p>
+        {isAuditFixPrompt(run.prompt) &&
+          (verifiedPayload?.report_started_at ? (
+            <p className="text-sm">
+              {FIX.verifiedBy}{" "}
+              {verifiedPayload.report_id ? (
+                <Link href={`/sites/${verifiedPayload.report_id}`} className="underline">
+                  <EtTime iso={verifiedPayload.report_started_at} />
+                </Link>
+              ) : (
+                <EtTime iso={verifiedPayload.report_started_at} />
+              )}
+            </p>
+          ) : (
+            <p className="text-sm text-muted">{FIX.notVerified}</p>
+          ))}
         {run.state !== "escalated" && needsYou && (
           <p>
             <Link href="/approvals" className="flex min-h-12 items-center underline">

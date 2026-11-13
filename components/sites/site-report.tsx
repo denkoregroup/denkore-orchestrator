@@ -1,13 +1,38 @@
 import Link from "next/link";
+import { FixControl } from "@/components/audit-fixes/fix-control";
 import { EtTime } from "@/components/sites/et-time";
+import { FIX, shortRunId } from "@/lib/audit-fixes/copy";
+import type { FindingMark, FixPlan } from "@/lib/audit-fixes/plan";
 import { countBySeverity, type Finding } from "@/lib/audits/types";
 import { diffReports } from "@/lib/site-health/diff";
 import { pagesLabel, SEVERITY_GROUPS, siteName, summaryLine } from "@/lib/site-health/labels";
 import { groupByPage } from "@/lib/site-health/pages";
 import type { StoredReport } from "@/lib/site-health/queries";
 
+/** What the owner can do about a finding. Never printed: a client PDF has no "Needs you". */
+function FixMark({ mark }: { mark: FindingMark | undefined }) {
+  if (mark?.kind === "needs_you") {
+    return (
+      <span className="block text-muted print:hidden">
+        {FIX.needsYou} · {mark.instruction}
+      </span>
+    );
+  }
+  if (mark?.kind === "in_progress") {
+    return (
+      <span className="block text-muted print:hidden">
+        {FIX.inProgress} ·{" "}
+        <Link href={`/runs/${mark.runId}`} className="underline">
+          {FIX.runLabel(shortRunId(mark.runId))}
+        </Link>
+      </span>
+    );
+  }
+  return null;
+}
+
 /** Findings under their page: the address once, as a small heading, then one short line per finding. */
-function PageGroups({ items, host }: { items: Finding[]; host: string }) {
+function PageGroups({ items, host, marks }: { items: Finding[]; host: string; marks?: FixPlan["marks"] }) {
   return (
     <div className="space-y-3">
       {groupByPage(items, host).map((group) => (
@@ -23,7 +48,10 @@ function PageGroups({ items, host }: { items: Finding[]; host: string }) {
           </h3>
           <ul className="mt-1 space-y-1 text-sm">
             {group.findings.map((f) => (
-              <li key={f.id}>{f.message}</li>
+              <li key={f.id}>
+                {f.message}
+                <FixMark mark={marks?.get(f.id)} />
+              </li>
             ))}
           </ul>
         </div>
@@ -73,8 +101,11 @@ function Changes({ current, previous, host }: { current: StoredReport; previous:
   );
 }
 
-/** One stored report: a summary, what changed since the one before, then every finding by severity and page. */
-export function SiteReport({ current, previous }: { current: StoredReport; previous: StoredReport | null }) {
+/**
+ * One stored report: a summary, what changed since the one before, then every finding by severity and page.
+ * With `fixes`, each finding says what can be done about it and each group gets its Fix with Conductor button.
+ */
+export function SiteReport({ current, previous, fixes }: { current: StoredReport; previous: StoredReport | null; fixes?: FixPlan }) {
   const { findings, target } = current.report;
   const host = new URL(target).host;
   const counts = countBySeverity(findings);
@@ -116,8 +147,9 @@ export function SiteReport({ current, previous }: { current: StoredReport; previ
               <summary className="flex min-h-12 cursor-pointer items-center px-3 font-semibold print:min-h-0 print:px-0">
                 {label} ({items.length})
               </summary>
-              <div className="px-3 pb-3 pt-1 print:px-0">
-                <PageGroups items={items} host={host} />
+              <div className="space-y-3 px-3 pb-3 pt-1 print:px-0">
+                {fixes?.groups[severity] && <FixControl reportId={current.id} severity={severity} button={fixes.groups[severity]} />}
+                <PageGroups items={items} host={host} marks={fixes?.marks} />
               </div>
             </details>
           );
@@ -127,7 +159,8 @@ export function SiteReport({ current, previous }: { current: StoredReport; previ
             <h2 id={`${severity}-heading`} className={`font-semibold ${severity === "fail" ? "text-accent" : ""}`}>
               {label} ({items.length})
             </h2>
-            <PageGroups items={items} host={host} />
+            {fixes?.groups[severity] && <FixControl reportId={current.id} severity={severity} button={fixes.groups[severity]} />}
+            <PageGroups items={items} host={host} marks={fixes?.marks} />
           </section>
         );
       })}
