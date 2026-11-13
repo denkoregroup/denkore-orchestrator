@@ -9,7 +9,7 @@ const ID = "6f1c2b9e-4a3d-4c1e-9b7a-2d5e8f0a1b3c";
 
 function stored(list = [findings.noTitle], startedAt = "2026-11-08T10:00:00.000Z"): StoredReport {
   const report = auditReport(list, { startedAt, finishedAt: startedAt });
-  return { id: ID, target: report.target, startedAt, pagesChecked: 3, report };
+  return { id: ID, projectId: null, target: report.target, startedAt, pagesChecked: 3, report };
 }
 
 describe("SiteList", () => {
@@ -73,7 +73,7 @@ const LATER = "2026-11-08T10:00:00.000Z";
 
 function denkoreReport(startedAt = LATER, list = denkoreFindings()): StoredReport {
   const report = auditReport(list, { target: DENKORE_TARGET, startedAt, finishedAt: startedAt });
-  return { id: ID, target: DENKORE_TARGET, startedAt, pagesChecked: 1, report };
+  return { id: ID, projectId: null, target: DENKORE_TARGET, startedAt, pagesChecked: 1, report };
 }
 
 const section = (name: RegExp) => screen.getByRole("heading", { level: 2, name }).closest("section")!;

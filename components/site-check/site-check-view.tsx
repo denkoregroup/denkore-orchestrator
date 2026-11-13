@@ -25,10 +25,11 @@ export function SiteCheckView({ current, bookingUrl = BOOKING_URL }: { current: 
   const summary = summarizeForProspect(report);
   const { headline, supporting } = summary;
 
+  // A prospect (no project) goes back to the prospects, a registered site to the sites.
   const back = (
     <p className="print:hidden">
-      <Link href="/sites" className="font-copy text-sm text-check-muted underline">
-        ← {VIEW.back}
+      <Link href={current.projectId === null ? "/prospects" : "/sites"} className="font-copy text-sm text-check-muted underline">
+        ← {current.projectId === null ? VIEW.backProspects : VIEW.back}
       </Link>
     </p>
   );
