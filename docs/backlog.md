@@ -344,3 +344,24 @@ and extend `__tests__/print/print.test.tsx`.
 **Suggested fix:** Add the flag when it exists, confirm the registry fields, and
 route both failures (the red run, the escalation event) to the notification
 channel once there is one.
+
+## Prospects: follow-ups
+
+The quick check (`/prospects`) is built; these were left out on purpose or found on the way.
+
+- **Try it once for real.** On a phone, type a business's site, tap Check site, and confirm
+  you land on its site check within about 20 seconds and that it then appears under
+  Prospects. Then type one of your own registered sites: it opens its check but is not
+  listed under Prospects.
+- **A registered site's quick check is in neither list.** It is stored with no project (the
+  quick check never passes a registry id), so it is not under Your sites, and its address
+  matches the registry, so it is not under Prospects. It is still reachable from the check
+  it redirected to. Decide whether Your sites should show it.
+- **Private addresses are stored as "couldn't load".** The fetcher refuses them, so typing
+  `localhost` gives an unreachable report and a Prospects row. Refusing before the audit
+  needs the fetcher's address test exported.
+- **Deleting a prospect's reports** needs a database change, so it waits for #24.
+- **Share links, and full 25-page crawls from the app** (after #32), are out of scope.
+- **Worst-case time.** Each request is cut off at 8 seconds, but a quick check makes a dozen
+  or so. A slow host could pass the route's 60 seconds; the form then shows the plain failure
+  message. A real site took about 4 seconds when timed.

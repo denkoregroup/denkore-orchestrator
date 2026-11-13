@@ -20,6 +20,19 @@ describe("Activity (formerly Audit)", () => {
     expect(screen.getByRole("link", { name: "Activity" })).toHaveAttribute("aria-current", "page");
   });
 
+  it("keeps one Sites item, and marks it on both the Sites and the Prospects pages", () => {
+    expect(NAV_ITEMS.filter((i) => i.label === "Sites")).toHaveLength(1);
+    for (const path of ["/sites", "/sites/abc", "/prospects"]) {
+      pathname = path;
+      const { unmount } = render(<Nav />);
+      expect(screen.getByRole("link", { name: "Sites" })).toHaveAttribute("aria-current", "page");
+      unmount();
+    }
+    pathname = "/runs";
+    render(<Nav />);
+    expect(screen.getByRole("link", { name: "Sites" })).not.toHaveAttribute("aria-current");
+  });
+
   it("keeps /audit redirecting to /activity, as a temporary redirect", async () => {
     expect(await nextConfig.redirects?.()).toEqual([{ source: "/audit", destination: "/activity", permanent: false }]);
   });
