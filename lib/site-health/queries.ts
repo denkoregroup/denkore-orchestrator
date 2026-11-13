@@ -1,5 +1,6 @@
 import "server-only";
 import { z } from "zod";
+import { siteHostOf } from "@/lib/audits/fetcher";
 import { auditReportSchema, compareStrings, type AuditReport } from "@/lib/audits/types";
 import { requireOwner } from "@/lib/auth";
 import { parseRow, parseRows, queryError } from "@/lib/data/rows";
@@ -47,6 +48,8 @@ export interface UnreportedSite {
 
 export interface StoredReport {
   id: string;
+  /** The project the report is linked to; null for a prospect (a site that is not registered). */
+  projectId: string | null;
   target: string;
   startedAt: string;
   pagesChecked: number;
@@ -67,7 +70,7 @@ function summarize(row: z.infer<typeof summaryRow>, overdue: boolean): SiteSumma
 const projectRow = z.object({ id: z.uuid(), registry_id: z.string(), created_at: z.string() });
 
 /**
- * Every audited site with its latest report, by address. PostgREST cannot pick the newest row per
+ * Every registered site (a report with a project) with its latest report, by address. PostgREST cannot pick the newest row per
  * group, so this reads the newest SITES_SCAN_LIMIT report summaries (no findings) and keeps the first
  * per target. `truncated` says the read hit that limit, so a site with no recent report may be missing.
  *
@@ -80,6 +83,7 @@ export async function listSites(now = new Date()): Promise<{ sites: SiteSummary[
   const { data, error } = await db
     .from("audit_reports")
     .select(SUMMARY_COLUMNS)
+    .not("project_id", "is", null)
     .order("started_at", { ascending: false })
     .limit(SITES_SCAN_LIMIT);
   if (error) throw queryError("listSites", error);
@@ -116,7 +120,7 @@ export async function listSites(now = new Date()): Promise<{ sites: SiteSummary[
 }
 
 function stored(row: z.infer<typeof reportRow>): StoredReport {
-  return { id: row.id, target: row.target, startedAt: row.started_at, pagesChecked: row.pages_checked, report: row.report };
+  return { id: row.id, projectId: row.project_id, target: row.target, startedAt: row.started_at, pagesChecked: row.pages_checked, report: row.report };
 }
 
 /** One stored report, and the report for the same site just before it (null for the first). Null if there is no such report. */
@@ -140,4 +144,59 @@ export async function getSiteReport(id: string): Promise<{ current: StoredReport
   if (before.error) throw queryError("getSiteReport (previous report)", before.error);
   const [previous] = parseRows(reportRow, before.data, "audit_reports");
   return { current, previous: previous ? stored(previous) : null };
+}
+
+/** How many recent prospect checks the Prospects page lists. */
+export const PROSPECT_LIMIT = 20;
+
+/**
+ * The newest report for each prospect's address, newest first, up to PROSPECT_LIMIT. A prospect is a
+ * report with no project. An address that belongs to a registered site (a registry entry with an
+ * audits block, www or not) is not a prospect: it is listed under Your sites.
+ */
+export async function listProspects(): Promise<StoredReport[]> {
+  await requireOwner();
+  const db = await createClient();
+
+  const registeredHosts = new Set(
+    [...(await getRegistry()).values()].flatMap((entry) => (entry.audits ? [siteHostOf(new URL(entry.audits.url).hostname)] : [])),
+  );
+
+  const { data, error } = await db
+    .from("audit_reports")
+    .select(SUMMARY_COLUMNS)
+    .is("project_id", null)
+    .order("started_at", { ascending: false })
+    .limit(SITES_SCAN_LIMIT);
+  if (error) throw queryError("listProspects", error);
+  const rows = parseRows(summaryRow, data, "audit_reports");
+
+  // Rows are newest first, so the first one seen for an address is its newest report.
+  const newest = new Map<string, z.infer<typeof summaryRow>>();
+  for (const row of rows) {
+    if (newest.has(row.target) || registeredHosts.has(siteHostOf(new URL(row.target).hostname))) continue;
+    newest.set(row.target, row);
+  }
+  const ids = [...newest.values()].slice(0, PROSPECT_LIMIT).map((row) => row.id);
+  if (ids.length === 0) return [];
+
+  // The findings are needed for the lights, but only for the rows shown.
+  const full = await db.from("audit_reports").select(REPORT_COLUMNS).in("id", ids);
+  if (full.error) throw queryError("listProspects (reports)", full.error);
+  const byId = new Map(parseRows(reportRow, full.data, "audit_reports").map((row) => [row.id, stored(row)]));
+  return ids.map((id) => {
+    const report = byId.get(id);
+    if (!report) throw new Error(`listProspects: report ${id} was listed but could not be read back`);
+    return report;
+  });
+}
+
+/** The id of the report just stored for this address and start time. Throws if it cannot be read back. */
+export async function findReportId(target: string, startedAt: string): Promise<string> {
+  await requireOwner();
+  const db = await createClient();
+  const found = await db.from("audit_reports").select("id").eq("target", target).eq("started_at", startedAt).maybeSingle();
+  if (found.error) throw queryError("findReportId", found.error);
+  if (!found.data) throw new Error("findReportId: the report was stored but cannot be read back");
+  return parseRow(z.object({ id: z.uuid() }), found.data, "audit_reports").id;
 }
