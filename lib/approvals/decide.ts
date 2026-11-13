@@ -59,7 +59,7 @@ export function noteFor(form: DecisionForm, mode: ApprovalMode): { note: string 
 }
 
 /**
- * Turns the approval triggers' errors (003_functions.sql) into words.
+ * Turns the approval triggers' errors (supabase/migrations/…_functions.sql) into words.
  *   approvals_before_insert: "approval is for X, but the gate now covers Y" -> stale
  *                            "gate is already approved|changes_requested"   -> already decided
  *                            "not the owner of this gate" / RLS / 42501     -> not allowed

@@ -31,9 +31,9 @@ unchanged SHA after "request changes" gets stuck. `gates` is unique on
 `(run_id, kind)`, setting the same SHA does not fire `gates_sha_changed`, so
 the gate stays `changes_requested` and every new approval is rejected.
 
-**Suggested fix:** Add a CI job that applies `supabase/sql/` to a throwaway
-Postgres (or the Supabase CLI's local stack) and asserts the grants, RLS
-policies, and triggers. For `005_audit_reports.sql` the assertions were run
+**Suggested fix:** Add a CI job that applies `supabase/migrations/` to a throwaway
+Postgres (or the Supabase CLI's local stack, `pnpm db:reset`) and asserts the grants, RLS
+policies, and triggers. For `20261113000005_audit_reports.sql` the assertions were run
 once by hand against a local Postgres 16 with stand-in roles: the unique key,
 select/insert-only grants for `service_role`, read-only for the owner, and
 nothing for `anon`. Put those in the job. Add a Jest test for `updateSession` with a mocked
@@ -48,7 +48,7 @@ then test it.
 Code-owner review becomes useful once others contribute.
 
 **Suggested fix:** When more developers join (expected in year 2–3), add
-`.github/CODEOWNERS` for `.github/`, `supabase/sql/`, and test files. Turn on
+`.github/CODEOWNERS` for `.github/`, `supabase/migrations/`, and test files. Turn on
 "Require review from Code Owners" in the branch ruleset.
 
 ## Live updates with Supabase Realtime
@@ -156,6 +156,11 @@ the env vars, walk through:
     check `/sites` (Overdue) and Activity ("Audit overdue: no new report for
     <site> in over 2 days"). The tick's answer in the Actions log lists the same
     sites under `watchdog.overdue`. Re-enable the workflow afterwards.
+20. Migration deploy: set the secrets `SUPABASE_ACCESS_TOKEN` and `SUPABASE_DB_PASSWORD`
+    and the variable `SUPABASE_PROJECT_REF`, and do the one-time repair (README). Run
+    "Supabase migrations" by hand: the dry-run step lists nothing pending, and the push
+    says the database is up to date. Then add a trivial migration and run it again to see
+    it listed and applied.
 
 ## Reopen a changes-requested gate at the same SHA
 
@@ -344,3 +349,15 @@ and extend `__tests__/print/print.test.tsx`.
 **Suggested fix:** Add the flag when it exists, confirm the registry fields, and
 route both failures (the red run, the escalation event) to the notification
 channel once there is one.
+
+## Local Supabase: follow-ups
+
+Found while setting up the local stack (`supabase/config.toml`).
+
+- `[db] major_version = 17` is the CLI's default. Run `show server_version;` on
+  production and match it, or a migration could pass locally and fail there.
+- In a mock-GitHub test, Auth also linked the seeded owner when the provider
+  reported that email as unverified. Real GitHub's primary email is verified, so
+  this is probably moot, but it is worth checking against the real app.
+- Add a CI job that runs `supabase start` and `supabase db reset` on every
+  pull request, so a migration that does not apply fails before the deploy.
