@@ -1,3 +1,4 @@
+import { formatEt } from "@/lib/format";
 import type { RunState } from "@/lib/state-machine/states";
 import type { StepName } from "@/lib/step-runner/types";
 
@@ -51,6 +52,8 @@ const EVENT_KIND_LABELS: Record<string, string> = {
   "conductor.step_timed_out": "A step didn’t report back in time and was stopped",
   "conductor.transition_rejected": "A move was refused",
   "audit.overdue": "A site hasn’t been audited on schedule",
+  "audit.fix_requested": "Fix started from a site report",
+  "audit.fix_verified": "Verified by a later audit report",
 };
 
 /** Plain-language label for known event kinds; the raw kind otherwise. */
@@ -73,6 +76,10 @@ export function eventDescription(kind: string, payload: unknown): string {
   if (kind === "audit.overdue" && payload && typeof payload === "object" && "registryId" in payload) {
     const site = (payload as { registryId: unknown }).registryId;
     if (typeof site === "string" && site) return `Audit overdue: no new report for ${site} in over 2 days`;
+  }
+  if (kind === "audit.fix_verified" && payload && typeof payload === "object" && "report_started_at" in payload) {
+    const startedAt = (payload as { report_started_at: unknown }).report_started_at;
+    if (typeof startedAt === "string" && !Number.isNaN(Date.parse(startedAt))) return `Verified by report ${formatEt(startedAt)}`;
   }
   return eventKindLabel(kind);
 }

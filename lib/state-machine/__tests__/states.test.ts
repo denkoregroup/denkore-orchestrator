@@ -14,7 +14,7 @@ import {
 // change to ALLOWED_TRANSITIONS has to be mirrored here deliberately.
 const ABORT: RunState[] = ["failed", "cancelled", "escalated"];
 const EXPECTED: Record<RunState, RunState[]> = {
-  queued: ["spec", ...ABORT],
+  queued: ["spec", "build_test", ...ABORT],
   spec: ["spec_gate", ...ABORT],
   spec_gate: ["design", "spec", ...ABORT],
   design: ["design_gate", ...ABORT],

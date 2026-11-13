@@ -1,6 +1,8 @@
 /**
  * @jest-environment node
  */
+import { buildFixPrompt, FIX_VERIFIED_EVENT } from "@/lib/audit-fixes/prompt";
+import { finding } from "@/lib/audits/types";
 import { loadRegistry } from "@/lib/registry/loader";
 import type { RegistryEntry } from "@/lib/registry/schema";
 import type { GateKind } from "@/lib/state-machine";
@@ -482,5 +484,132 @@ describe("advanceRun: steps that never report back", () => {
     const result = await advanceRun(id, { ...t.deps, store: staleStore });
     expect(result.stopped).toBe("raced");
     expect(t.store.events.filter((e) => e.kind === "conductor.step_timed_out")).toHaveLength(0);
+  });
+});
+
+describe("advanceRun: a fix run made from a site report, on the stub runner", () => {
+  const FINDINGS = [
+    finding({ check: "page.description", severity: "warn", url: "https://www.denkore.com/", key: "missing", message: "This page has no description." }),
+    finding({ check: "site.sitemap", severity: "warn", url: "https://www.denkore.com/sitemap.xml", key: "missing", message: "Your site has no sitemap." }),
+  ];
+  const IDS = FINDINGS.map((f) => f.id);
+  const prompt = buildFixPrompt({ target: "https://www.denkore.com/", findings: FINDINGS });
+
+  /** The click: a queued run with the marker prompt, and the event that names its findings. */
+  function click() {
+    const t = setup();
+    const id = t.store.addRun({ prompt });
+    t.store.requestFix(id, IDS);
+    return { t, id };
+  }
+
+  /** Runs the fix route up to the live check: build, test, final check, the owner's OK, go live. */
+  async function toLiveCheck() {
+    const { t, id } = click();
+    await t.advance(id);
+    await t.complete(id); // build_test
+    await t.complete(id); // verify
+    await t.ownerDecides(id, "release", "approve");
+    await t.complete(id); // deploy
+    return { t, id };
+  }
+
+  it("goes straight to build and test: no spec, no design, and the click is the spec gate", async () => {
+    const { t, id } = click();
+    await t.advance(id);
+    expect(t.state(id)).toBe("build_test");
+    expect(t.dispatched.map((d) => d.step)).toEqual(["build_test"]);
+    expect(t.store.gates.filter((g) => g.runId === id)).toEqual([]);
+    expect(t.store.events.filter((e) => e.runId === id && e.kind === "run.state_changed").map((e) => e.payload.to)).toEqual(["build_test"]);
+  });
+
+  it("uses only the build, test and final-check agents, then the owner's OK to go live", async () => {
+    const { t, id } = await toLiveCheck();
+    expect(t.dispatched.map((d) => d.step)).toEqual(["build_test", "verify", "deploy"]);
+    expect(t.state(id)).toBe("post_deploy_check");
+    expect(t.store.gateFor(id, "release")).toBeDefined();
+    expect(t.store.gateFor(id, "spec")).toBeUndefined();
+    expect(t.store.gateFor(id, "design")).toBeUndefined();
+  });
+
+  it("hands the build step the findings and the acceptance criterion, and the final check a scope test", async () => {
+    const { t, id } = click();
+    await t.advance(id);
+    await t.complete(id);
+    const [build, verify] = t.dispatched;
+    expect(build.task).toContain("- page.description | https://www.denkore.com/ | This page has no description.");
+    expect(build.task).toContain("the next audit report shows every one of them fixed");
+    expect(verify.task).toContain("Every change in this commit must map to one of them");
+    expect(build.task).not.toContain("Every change in this commit must map");
+  });
+
+  it("does not finish on a merged pull request: it waits for a report", async () => {
+    const { t, id } = await toLiveCheck();
+    expect(t.store.latestStep(id).prUrl).toBe("https://example.com/pr/1");
+    for (let i = 0; i < 3; i++) expect((await t.advance(id)).stopped).toBe("waiting");
+    expect(t.state(id)).toBe("post_deploy_check");
+    // No live-check step is sent: the next audit report is the check.
+    expect(t.dispatched.map((d) => d.step)).not.toContain("post_deploy_check");
+  });
+
+  it("ignores a report made before the change went live", async () => {
+    const { t, id } = click();
+    t.store.addReport({ findingIds: [] }); // older than everything the run does
+    await t.advance(id);
+    await t.complete(id);
+    await t.complete(id);
+    await t.ownerDecides(id, "release", "approve");
+    await t.complete(id);
+    expect(t.state(id)).toBe("post_deploy_check");
+    expect((await t.advance(id)).stopped).toBe("waiting");
+    expect(t.state(id)).toBe("post_deploy_check");
+  });
+
+  it("is done, and says which report verified it, when a later report shows the findings fixed", async () => {
+    const { t, id } = await toLiveCheck();
+    const reportId = t.store.addReport({ findingIds: ["9999999999999999"] }); // a different, unrelated finding
+    expect((await t.advance(id)).applied.map((a) => a.type)).toEqual(["verify_fix"]);
+    expect(t.state(id)).toBe("done");
+    const verified = t.store.events.find((e) => e.runId === id && e.kind === FIX_VERIFIED_EVENT)!;
+    expect(verified.payload.report_id).toBe(reportId);
+    expect(typeof verified.payload.report_started_at).toBe("string");
+  });
+
+  it("escalates when the next report still shows a finding open", async () => {
+    const { t, id } = await toLiveCheck();
+    t.store.addReport({ findingIds: [IDS[1]] });
+    const result = await t.advance(id);
+    expect(result.stopped).toBe("escalated");
+    expect(result.reason).toBe("The next audit report still shows 1 of the 2 findings open.");
+    expect(t.state(id)).toBe("escalated");
+    expect(t.store.events.some((e) => e.runId === id && e.kind === FIX_VERIFIED_EVENT)).toBe(false);
+  });
+
+  it("escalates, not guesses, when the run's finding list is missing", async () => {
+    const t = setup();
+    const id = t.store.addRun({ prompt }); // no event
+    await t.advance(id);
+    await t.complete(id);
+    await t.complete(id);
+    await t.ownerDecides(id, "release", "approve");
+    await t.complete(id); // deploy: the live check cannot be made, with or without a report
+    expect(t.state(id)).toBe("escalated");
+    const escalated = t.store.events.find((e) => e.runId === id && e.kind === "conductor.escalated")!;
+    expect(escalated.payload).toEqual({ reason: REASONS.fixListMissing, from: "post_deploy_check" });
+  });
+
+  it("counts only reports for the run's own site", async () => {
+    const { t, id } = await toLiveCheck();
+    t.store.addReport({ findingIds: [], registryId: "another-site" });
+    expect((await t.advance(id)).stopped).toBe("waiting");
+    expect(t.state(id)).toBe("post_deploy_check");
+  });
+
+  it("leaves an ordinary run alone: it still starts with the spec", async () => {
+    const t = setup();
+    const id = t.store.addRun({ prompt: "Build the booking page" });
+    await t.advance(id);
+    expect(t.state(id)).toBe("spec");
+    expect(t.dispatched.map((d) => d.step)).toEqual(["spec"]);
   });
 });

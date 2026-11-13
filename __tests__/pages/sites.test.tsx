@@ -3,6 +3,7 @@ import { auditReport, findings } from "@/test-utils/site-reports";
 
 const listSites = jest.fn();
 const getSiteReport = jest.fn();
+const loadFixContext = jest.fn();
 const notFound = jest.fn(() => {
   throw new Error("NEXT_HTTP_ERROR_FALLBACK;404");
 });
@@ -11,7 +12,9 @@ jest.mock("@/lib/site-health/queries", () => ({
   listSites: () => listSites(),
   getSiteReport: (id: string) => getSiteReport(id),
 }));
+jest.mock("@/lib/audit-fixes/queries", () => ({ loadFixContext: (id: string, target: string) => loadFixContext(id, target) }));
 jest.mock("next/navigation", () => ({ notFound: () => notFound() }));
+jest.mock("@/app/(app)/sites/[id]/actions", () => ({ fixWithConductorAction: jest.fn() }));
 
 import SitePage from "@/app/(app)/sites/[id]/page";
 import SitesPage from "@/app/(app)/sites/page";
@@ -21,6 +24,8 @@ const ID = "6f1c2b9e-4a3d-4c1e-9b7a-2d5e8f0a1b3c";
 beforeEach(() => {
   listSites.mockReset();
   getSiteReport.mockReset();
+  loadFixContext.mockReset();
+  loadFixContext.mockResolvedValue({ projectId: null, repo: null, isLatest: false, openRun: null });
   notFound.mockClear();
 });
 
@@ -62,6 +67,22 @@ describe("/sites/[id]", () => {
     expect(getSiteReport).toHaveBeenCalledWith(ID);
     expect(screen.getByRole("heading", { name: "Needs fixing (1)" })).toBeVisible();
     expect(screen.getByRole("heading", { name: "New (1)" })).toBeVisible();
+  });
+
+  it("hands the report to Fix with Conductor with what it knows about the site", async () => {
+    const report = auditReport([findings.noTitle]);
+    getSiteReport.mockResolvedValue({ current: { id: ID, target: report.target, startedAt: report.startedAt, pagesChecked: 3, report }, previous: null });
+    loadFixContext.mockResolvedValue({ projectId: "11111111-1111-4111-8111-111111111111", repo: "denkoregroup/denkore", isLatest: true, openRun: null });
+    render(await SitePage(params(ID)));
+    expect(loadFixContext).toHaveBeenCalledWith(ID, report.target);
+    expect(screen.getByRole("button", { name: "Fix with Conductor" })).toBeEnabled();
+  });
+
+  it("does not hide a failure to read what it needs for the fix button", async () => {
+    const report = auditReport([findings.noTitle]);
+    getSiteReport.mockResolvedValue({ current: { id: ID, target: report.target, startedAt: report.startedAt, pagesChecked: 3, report }, previous: null });
+    loadFixContext.mockRejectedValue(new Error("loadFixContext (project) failed: permission denied"));
+    await expect(SitePage(params(ID))).rejects.toThrow(/permission denied/);
   });
 
   it("without a report for that id, shows not found", async () => {

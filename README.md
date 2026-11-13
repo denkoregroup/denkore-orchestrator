@@ -67,6 +67,7 @@ CI runs typecheck, lint and tests on every pull request.
 | `lib/audits/` | The site auditor (CLI: `scripts/audit-run.ts`) |
 | `lib/site-check/` | The prospect site check: four lights, a headline and the top three fixes from one report (all wording, and the booking link, in `copy.ts`) |
 | `components/site-check/` | The site check view and its QR code |
+| `lib/audit-fixes/` | Fix with Conductor on a site report: what can be fixed in code (`lib/audits/checks/catalog.ts`), the run's prompt, and the buttons |
 | `lib/site-health/` | Stored audit reports, what changed between two of them, and the missed-run watchdog the tick runs |
 | `supabase/sql/` | Schema, RLS and triggers, pasted in by hand |
 | `registry/` | One YAML file per project |

@@ -344,3 +344,35 @@ and extend `__tests__/print/print.test.tsx`.
 **Suggested fix:** Add the flag when it exists, confirm the registry fields, and
 route both failures (the red run, the escalation event) to the notification
 channel once there is one.
+
+## Fix with Conductor: follow-ups
+
+Built on the stub runner (#22). Out of this slice, or decided on the way:
+
+- **"Accept a finding" (#20) does not exist yet.** A run holds the open, fixable findings of a
+  severity group; once findings can be accepted, leave the accepted ones out in
+  `findingsForRun` (`lib/audit-fixes/plan.ts`).
+- **Before the first real run (David):** move `denkore.com`'s repo into `denkoregroup` as the
+  issue lists (CI caller workflow first, transfer, `denkore-gate` property, reconnect hosting,
+  update `repo:` in `registry/denkore-com.yaml`). The real runner is #32; until then the stub
+  runner only records what it would dispatch, and a person posts step completions with
+  `pnpm conductor:simulate`.
+- **How to try it on the stub:** open a registered site's report, press Fix with Conductor on a
+  group, then post a completion for each step with `pnpm conductor:simulate` (build_test,
+  verify, then approve the release gate in the app, then deploy). The run then waits in
+  "Checking the live site" for the next audit report of that site; run
+  `pnpm audit:run --project denkore-com --post`. On the stub nothing was fixed, so the run
+  escalates ("still shows N findings open"); that is the designed outcome.
+- **Which report verifies.** The first report for the project made after the run entered the live
+  check decides. If a hosting cache still serves the old page then, the run escalates and the owner
+  looks. Waiting for a second report would be a later change.
+- **Two clicks at once.** "Only one open run per site" is checked when the button is pressed and
+  again in the action, but the database has no constraint, so two clicks in the same instant could
+  both pass. A partial unique index would close it (a database change, so not made here).
+- **Which checks need a person** is in `lib/audits/checks/catalog.ts`. Security headers are marked
+  hosting settings; for a site whose headers live in its code (a `next.config` or `vercel.json`),
+  that could be `true`.
+- **Messages in the run prompt.** A few auditor messages include a host name taken from the site
+  (canonical and sitemap on another site, and fetch errors in the sitemap and link messages). They
+  are cut to one plain line, but the host name is site-controlled text. If that matters, give those
+  findings a fixed message for prompts.

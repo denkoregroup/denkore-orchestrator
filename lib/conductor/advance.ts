@@ -5,6 +5,7 @@ import { buildStepInput } from "./contract";
 import { decide, STEP_DEADLINE_SECONDS } from "./decide";
 import { defaultConductorDeps } from "./defaults";
 import { LIMITS } from "./limits";
+import { FIX_VERIFIED_EVENT } from "@/lib/audit-fixes/prompt";
 import { STEP_TIMED_OUT_EVENT, type ConductorStore } from "./store";
 import type { ConductorAction, RunSnapshot } from "./types";
 
@@ -119,6 +120,23 @@ export async function advanceRun(runId: string, deps: ConductorDeps = defaultCon
           await store.logEvent(runId, "conductor.escalated", { reason, from: snapshot.state });
           return stop("escalated", reason);
         }
+        break;
+      }
+
+      case "verify_fix": {
+        const result = transition(contextOf(snapshot), { type: "check_passed" });
+        if (!result.ok) {
+          await store.logEvent(runId, "conductor.transition_rejected", { event: "check_passed", error: result.error });
+          return stop("rejected", result.error);
+        }
+        const won = await store.setState(
+          runId,
+          { state: snapshot.state, stateEnteredAt: snapshot.stateEnteredAt },
+          { state: result.run.state, testFailures: result.run.testFailures, stateEnteredAt: deps.now() },
+        );
+        if (!won) return stop("raced");
+        applied.push(action);
+        await store.logEvent(runId, FIX_VERIFIED_EVENT, { report_id: action.reportId, report_started_at: action.reportStartedAt });
         break;
       }
 

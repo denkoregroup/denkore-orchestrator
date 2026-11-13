@@ -13,11 +13,13 @@
  */
 import "server-only";
 import { z } from "zod";
+import { FIX_REQUESTED_EVENT, isAuditFixPrompt } from "@/lib/audit-fixes/prompt";
+import { auditReportSchema } from "@/lib/audits/types";
 import { createServiceClient } from "@/lib/supabase/admin";
 import { RUN_STATES, TERMINAL_STATES, type GateKind, type RunState } from "@/lib/state-machine";
 import { STEP_NAMES, type StepName } from "@/lib/step-runner/types";
 import { STEP_TIMED_OUT_EVENT, type ConductorStore, type InsertResult } from "./store";
-import type { RunSnapshot } from "./types";
+import type { FixSnapshot, RunSnapshot } from "./types";
 
 const numeric = z.union([z.number(), z.string().regex(/^-?\d+(\.\d+)?$/).transform(Number)]);
 
@@ -156,7 +158,33 @@ export class SupabaseConductorStore implements ConductorStore {
       }),
       totalCostUsd: steps.reduce((sum, s) => sum + (s.cost_usd ?? 0), 0),
       timedOutStepKeys,
+      fix: isAuditFixPrompt(run.prompt) ? await this.loadFix(run) : null,
     };
+  }
+
+  /**
+   * For a run made from an audit report: the findings it was started for, and, once it is checking the
+   * live site, the first audit report for its project made after it entered that state.
+   */
+  private async loadFix(run: z.infer<typeof runRow>): Promise<FixSnapshot> {
+    const requested = await this.db.from("events").select("payload").eq("run_id", run.id).eq("kind", FIX_REQUESTED_EVENT).order("id").limit(1);
+    if (requested.error) fail("load fix request", requested.error);
+    const [event] = z.array(z.object({ payload: z.object({ finding_ids: z.array(z.string()).optional() }).loose() })).parse(requested.data ?? []);
+
+    let nextReport: FixSnapshot["nextReport"] = null;
+    if (run.state === "post_deploy_check") {
+      const reports = await this.db
+        .from("audit_reports")
+        .select("id, started_at, report")
+        .eq("project_id", run.project_id)
+        .gt("started_at", run.updated_at)
+        .order("started_at", { ascending: true })
+        .limit(1);
+      if (reports.error) fail("load next report", reports.error);
+      const [row] = z.array(z.object({ id: z.uuid(), started_at: z.string(), report: auditReportSchema })).parse(reports.data ?? []);
+      if (row) nextReport = { id: row.id, startedAt: row.started_at, findingIds: row.report.findings.map((f) => f.id) };
+    }
+    return { findingIds: event?.payload.finding_ids ?? null, nextReport };
   }
 
   async setState(
