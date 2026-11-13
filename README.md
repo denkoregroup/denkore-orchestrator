@@ -60,7 +60,7 @@ CI runs typecheck, lint and tests on every pull request.
 
 | Path | What it is |
 | --- | --- |
-| `app/` | Pages (`/prompt`, `/runs`, `/approvals`, `/sites`, `/activity`, `/login`, and `/check/[reportId]`, the site check for a phone and its one-page PDF) and the API routes. `/activity` is the event log; `/audit` redirects there |
+| `app/` | Pages (`/prompt`, `/runs`, `/approvals`, `/sites`, `/prospects` (type a site, get a check in about 15 seconds), `/activity`, `/login`, and `/check/[reportId]`, the site check for a phone and its one-page PDF) and the API routes. `/activity` is the event log; `/audit` redirects there |
 | `proxy.ts` | Refreshes the session and keeps everyone but the owner out |
 | `lib/conductor/` | Decides and applies each run's next step; its limits are in `limits.ts` |
 | `lib/state-machine/` | Run states and allowed moves |
