@@ -1,0 +1,9 @@
+# Supabase
+.branches
+.temp
+
+# Local OAuth secrets (GITHUB_LOCAL_CLIENT_ID, GITHUB_LOCAL_SECRET)
+.env
+.env.keys
+.env.local
+.env.*.local
