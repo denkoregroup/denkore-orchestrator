@@ -144,6 +144,9 @@ the env vars, walk through:
     address is missing from the Redirect URLs allowlist (README, one-time
     setup, Sign in with GitHub). Also try the Cancel button on GitHub's prompt:
     `/login` should show "Sign-in didn't complete. Try again."
+17. Print a report: open a report on `/sites`, choose Print > Save as PDF. The
+    PDF has no nav, no header or sign-out, every finding including Good to know,
+    and reads in dark ink on white even from a browser in dark mode.
 
 ## Reopen a changes-requested gate at the same SHA
 
@@ -297,3 +300,13 @@ opened.
 **Suggested fix:** Use `formatEt` (or a `LocalTime` built on it) everywhere, and
 drop the UTC-then-local switch. Decide first whether Eastern is right for every
 page, or whether it should be a setting.
+
+## Hide the accepted-findings group when printing
+
+**Why:** The printable report (the print stylesheet in `app/globals.css`) hides
+the nav, header, sign-out and the "All sites" link, but the issue also asks
+that an accepted-findings group stays out of a client's PDF. That group does not
+exist yet, so nothing hides it.
+
+**Suggested fix:** When accepted findings land, give that group `print:hidden`
+and extend `__tests__/print/print.test.tsx`.

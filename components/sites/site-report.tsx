@@ -11,7 +11,7 @@ function PageGroups({ items, host }: { items: Finding[]; host: string }) {
   return (
     <div className="space-y-3">
       {groupByPage(items, host).map((group) => (
-        <div key={group.url}>
+        <div key={group.url} className="print:break-inside-avoid">
           <h3 className="break-all text-sm font-medium">
             {group.href ? (
               <a href={group.href} target="_blank" rel="noopener noreferrer" className="underline">
@@ -32,21 +32,25 @@ function PageGroups({ items, host }: { items: Finding[]; host: string }) {
   );
 }
 
+/**
+ * The status line is for the owner, so it never prints: a client PDF must not say "First report for
+ * this site" or "No changes since". The New and Fixed lists under it are findings and do print.
+ */
 function Changes({ current, previous, host }: { current: StoredReport; previous: StoredReport | null; host: string }) {
   if (!previous) {
-    return <p className="text-sm text-muted">First report for this site, so there is nothing to compare it with yet.</p>;
+    return <p className="text-sm text-muted print:hidden">First report for this site, so there is nothing to compare it with yet.</p>;
   }
   const { newFindings, stillOpen, fixed } = diffReports(previous.report, current.report);
   if (newFindings.length === 0 && fixed.length === 0) {
     return (
-      <p className="text-sm text-muted">
+      <p className="text-sm text-muted print:hidden">
         No changes since <EtTime iso={previous.startedAt} /> · {stillOpen.length} still open.
       </p>
     );
   }
   return (
     <>
-      <p className="text-sm text-muted">
+      <p className="text-sm text-muted print:hidden">
         Since <EtTime iso={previous.startedAt} />: {newFindings.length} new · {fixed.length} fixed · {stillOpen.length} still open.
       </p>
       {newFindings.length > 0 && (
@@ -78,7 +82,7 @@ export function SiteReport({ current, previous }: { current: StoredReport; previ
   return (
     <article className="mx-auto max-w-2xl space-y-4">
       <header className="space-y-1">
-        <p className="text-sm text-muted">
+        <p className="text-sm text-muted print:hidden">
           <Link href="/sites" className="underline">
             All sites
           </Link>
@@ -103,11 +107,11 @@ export function SiteReport({ current, previous }: { current: StoredReport; previ
         if (severity === "info") {
           // Native disclosure: closed until opened, everything still in the page, no client JS.
           return (
-            <details key={severity} className="rounded-lg border border-border">
-              <summary className="flex min-h-12 cursor-pointer items-center px-3 font-semibold">
+            <details key={severity} className="rounded-lg border border-border print:border-0">
+              <summary className="flex min-h-12 cursor-pointer items-center px-3 font-semibold print:min-h-0 print:px-0">
                 {label} ({items.length})
               </summary>
-              <div className="px-3 pb-3 pt-1">
+              <div className="px-3 pb-3 pt-1 print:px-0">
                 <PageGroups items={items} host={host} />
               </div>
             </details>
