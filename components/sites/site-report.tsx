@@ -87,6 +87,11 @@ export function SiteReport({ current, previous }: { current: StoredReport; previ
             All sites
           </Link>
         </p>
+        <p className="text-sm print:hidden">
+          <Link href={`/check/${current.id}`} className="underline">
+            Site check view
+          </Link>
+        </p>
         {/* The one link to the site itself; the page headings below link to individual pages. */}
         <h1 className="break-all text-xl font-semibold">
           <a href={target} target="_blank" rel="noopener noreferrer" className="underline">

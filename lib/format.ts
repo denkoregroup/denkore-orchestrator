@@ -27,3 +27,10 @@ const EASTERN = new Intl.DateTimeFormat("en-US", {
 export function formatEt(iso: string): string {
   return EASTERN.format(new Date(iso));
 }
+
+const EASTERN_DATE = new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", year: "numeric", month: "short", day: "numeric" });
+
+/** "Nov 8, 2026" (the date in Eastern time). Throws on a bad date. */
+export function formatEtDate(iso: string): string {
+  return EASTERN_DATE.format(new Date(iso));
+}

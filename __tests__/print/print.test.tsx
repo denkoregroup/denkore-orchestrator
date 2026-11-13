@@ -28,6 +28,10 @@ describe("printing a report (Save as PDF)", () => {
       <SiteReport current={{ id: "x", target: DENKORE_TARGET, startedAt: report.startedAt, pagesChecked: 1, report }} previous={null} />,
     );
     expect(screen.getByRole("link", { name: "All sites" }).closest("p")).toHaveClass("print:hidden");
+    // The link to the prospect-facing view is owner navigation, so it never prints either.
+    const check = screen.getByRole("link", { name: "Site check view" });
+    expect(check).toHaveAttribute("href", "/check/x");
+    expect(check.closest("p")).toHaveClass("print:hidden");
     for (const group of container.querySelectorAll("h3")) expect(group.parentElement).toHaveClass("print:break-inside-avoid");
   });
 
