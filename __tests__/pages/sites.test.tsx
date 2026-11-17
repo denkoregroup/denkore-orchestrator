@@ -55,8 +55,8 @@ describe("/sites/[id]", () => {
     const report = auditReport([findings.noTitle, findings.brokenLink]);
     const earlier = auditReport([findings.noTitle], { startedAt: "2026-11-01T10:00:00.000Z" });
     getSiteReport.mockResolvedValue({
-      current: { id: ID, target: report.target, startedAt: report.startedAt, pagesChecked: 3, report },
-      previous: { id: "7a2d3c0f-5b4e-4d2f-8c8b-3e6f9a1b2c4d", target: report.target, startedAt: earlier.startedAt, pagesChecked: 3, report: earlier },
+      current: { id: ID, projectId: null, target: report.target, startedAt: report.startedAt, pagesChecked: 3, report },
+      previous: { id: "7a2d3c0f-5b4e-4d2f-8c8b-3e6f9a1b2c4d", projectId: null, target: report.target, startedAt: earlier.startedAt, pagesChecked: 3, report: earlier },
     });
     render(await SitePage(params(ID)));
     expect(getSiteReport).toHaveBeenCalledWith(ID);

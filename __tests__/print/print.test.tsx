@@ -25,7 +25,7 @@ describe("printing a report (Save as PDF)", () => {
   it("hides the link back to all sites, and keeps a finding's page together on one printed page", () => {
     const report = auditReport(denkoreFindings(), { target: DENKORE_TARGET });
     const { container } = render(
-      <SiteReport current={{ id: "x", target: DENKORE_TARGET, startedAt: report.startedAt, pagesChecked: 1, report }} previous={null} />,
+      <SiteReport current={{ id: "x", projectId: null, target: DENKORE_TARGET, startedAt: report.startedAt, pagesChecked: 1, report }} previous={null} />,
     );
     expect(screen.getByRole("link", { name: "All sites" }).closest("p")).toHaveClass("print:hidden");
     // The link to the prospect-facing view is owner navigation, so it never prints either.
@@ -40,7 +40,7 @@ describe("printing a report (Save as PDF)", () => {
     const LATER = "2026-11-08T10:00:00.000Z";
     const stored = (list: Finding[], startedAt: string) => {
       const report = auditReport(list, { target: DENKORE_TARGET, startedAt, finishedAt: startedAt });
-      return { id: "x", target: DENKORE_TARGET, startedAt, pagesChecked: 1, report };
+      return { id: "x", projectId: null, target: DENKORE_TARGET, startedAt, pagesChecked: 1, report };
     };
     const statusLine = (re: RegExp) => screen.getByText(re).closest("p")!;
 
@@ -83,7 +83,7 @@ describe("printing a report (Save as PDF)", () => {
   it("still has Good to know in the page, collapsed on screen (the stylesheet opens it for print)", () => {
     const report = auditReport(denkoreFindings(), { target: DENKORE_TARGET });
     const { container } = render(
-      <SiteReport current={{ id: "x", target: DENKORE_TARGET, startedAt: report.startedAt, pagesChecked: 1, report }} previous={null} />,
+      <SiteReport current={{ id: "x", projectId: null, target: DENKORE_TARGET, startedAt: report.startedAt, pagesChecked: 1, report }} previous={null} />,
     );
     const details = container.querySelector("details")!;
     expect(details).not.toHaveAttribute("open");

@@ -158,4 +158,31 @@ export const VIEW = {
   findingsOnRequest: (count: number): string => `${count} ${count === 1 ? "finding" : "findings"} in full on request`,
   signature: "Site check by Denkore · Tech that's not confusing.",
   back: "All sites",
+  backProspects: "All prospects",
+} as const;
+
+/** The quick-check form on the Prospects page. */
+export const CHECK_FORM = {
+  label: "Their website",
+  placeholder: "theirbusiness.com",
+  hint: "Takes about 15 seconds. Looks at the homepage only.",
+  button: "Check site",
+  pending: "Checking…",
+  failed: "We couldn't check that site. Check the address and try again.",
+} as const;
+
+/** The Prospects page: its tabs, and one line per recent check. */
+export const PROSPECTS = {
+  tabSites: "Your sites",
+  tabProspects: "Prospects",
+  heading: "Prospects",
+  intro: "Type a business's website to see how it looks to a customer. Every check is kept here.",
+  recent: "Recent checks",
+  empty: "No checks yet. Type a website above to run one.",
+  unreachable: "couldn't load",
+  fixFirst: (count: number): string => `${count} to fix first`,
+  needsWork: (count: number): string => `${count} to work on`,
+  good: "looking good",
+  /** What the four small dots say, for a screen reader: how many areas are in each light. */
+  dots: (red: number, amber: number, green: number): string => `${red} ${STATUS_WORDS.red.toLowerCase()}, ${amber} ${STATUS_WORDS.amber.toLowerCase()}, ${green} ${STATUS_WORDS.green.toLowerCase()}`,
 } as const;
