@@ -9,7 +9,7 @@ import { SiteReport } from "@/components/sites/site-report";
 const ID = "6f1c2b9e-4a3d-4c1e-9b7a-2d5e8f0a1b3c";
 const RUN = "7a2d3c0f-5b4e-4d2f-8c8b-3e6f9a1b2c4d";
 const report = auditReport(denkoreFindings(), { target: DENKORE_TARGET });
-const current = { id: ID, target: DENKORE_TARGET, startedAt: report.startedAt, pagesChecked: 1, report };
+const current = { id: ID, target: DENKORE_TARGET, startedAt: report.startedAt, pagesChecked: 1, projectId: "11111111-1111-4111-8111-111111111111", report };
 const ready: FixContext = { projectId: "11111111-1111-4111-8111-111111111111", repo: "denkoregroup/denkore", isLatest: true, openRun: null };
 
 const show = (ctx: FixContext) => render(<SiteReport current={current} previous={null} fixes={planFixes(report, ctx)} />);
