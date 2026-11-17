@@ -24,10 +24,10 @@ import { finding } from "@/lib/audits/types";
 const ID = "6f1c2b9e-4a3d-4c1e-9b7a-2d5e8f0a1b3c";
 const STARTED = "2026-11-12T10:00:00.000Z";
 
-function stored(list: Finding[], overrides: { target?: string; pagesChecked?: number } = {}) {
+function stored(list: Finding[], overrides: { target?: string; pagesChecked?: number; projectId?: string | null } = {}) {
   const target = overrides.target ?? DENKORE_TARGET;
   const report = auditReport(list, { target, startedAt: STARTED, finishedAt: STARTED });
-  return { id: ID, target, startedAt: STARTED, pagesChecked: overrides.pagesChecked ?? 1, report };
+  return { id: ID, projectId: overrides.projectId ?? null, target, startedAt: STARTED, pagesChecked: overrides.pagesChecked ?? 1, report };
 }
 const denkore = () => stored(denkoreFindings());
 const printHidden = (el: Element | null) => expect(el).toHaveClass("print:hidden");
@@ -119,6 +119,29 @@ describe("the denkore.com site check", () => {
   });
 });
 
+describe("the back link", () => {
+  it("goes to the prospects for a report with no project", () => {
+    render(<SiteCheckView current={stored(denkoreFindings(), { projectId: null })} />);
+    expect(screen.getByRole("link", { name: /All prospects/ })).toHaveAttribute("href", "/prospects");
+    expect(screen.queryByRole("link", { name: /All sites/ })).toBeNull();
+  });
+
+  it("goes to the sites for a registered site's report", () => {
+    render(<SiteCheckView current={stored(denkoreFindings(), { projectId: "d3c0de00-0000-4000-8000-000000000002" })} />);
+    expect(screen.getByRole("link", { name: /All sites/ })).toHaveAttribute("href", "/sites");
+    expect(screen.queryByRole("link", { name: /All prospects/ })).toBeNull();
+  });
+
+  it("does the same when the site did not load", () => {
+    const unreachable = (projectId: string | null) => stored([finding({ check: "site.unreachable", severity: "warn", url: DENKORE_TARGET, message: "x" })], { projectId });
+    const { unmount } = render(<SiteCheckView current={unreachable(null)} />);
+    expect(screen.getByRole("link", { name: /All prospects/ })).toHaveAttribute("href", "/prospects");
+    unmount();
+    render(<SiteCheckView current={unreachable("d3c0de00-0000-4000-8000-000000000002")} />);
+    expect(screen.getByRole("link", { name: /All sites/ })).toHaveAttribute("href", "/sites");
+  });
+});
+
 describe("an unreachable site", () => {
   const unreachable = () => stored([finding({ check: "site.unreachable", severity: "warn", url: DENKORE_TARGET, message: "x", evidence: "Network error: nope" })]);
 
@@ -183,7 +206,7 @@ describe("fewer than three fixes, or none", () => {
 describe("printing (one Letter page)", () => {
   it("hides the back link, the chip, the buttons and the findings list", () => {
     const { container } = render(<SiteCheckView current={denkore()} />);
-    printHidden(screen.getByRole("link", { name: /All sites/ }).closest("p"));
+    printHidden(screen.getByRole("link", { name: /All prospects/ }).closest("p"));
     printHidden(screen.getByText("www.denkore.com"));
     printHidden(screen.getByRole("link", { name: "Book a call" }));
     printHidden(screen.getByRole("button", { name: "Save as PDF" }));

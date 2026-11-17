@@ -31,9 +31,9 @@ unchanged SHA after "request changes" gets stuck. `gates` is unique on
 `(run_id, kind)`, setting the same SHA does not fire `gates_sha_changed`, so
 the gate stays `changes_requested` and every new approval is rejected.
 
-**Suggested fix:** Add a CI job that applies `supabase/sql/` to a throwaway
-Postgres (or the Supabase CLI's local stack) and asserts the grants, RLS
-policies, and triggers. For `005_audit_reports.sql` the assertions were run
+**Suggested fix:** Add a CI job that applies `supabase/migrations/` to a throwaway
+Postgres (or the Supabase CLI's local stack, `pnpm db:reset`) and asserts the grants, RLS
+policies, and triggers. For `20261113000005_audit_reports.sql` the assertions were run
 once by hand against a local Postgres 16 with stand-in roles: the unique key,
 select/insert-only grants for `service_role`, read-only for the owner, and
 nothing for `anon`. Put those in the job. Add a Jest test for `updateSession` with a mocked
@@ -48,7 +48,7 @@ then test it.
 Code-owner review becomes useful once others contribute.
 
 **Suggested fix:** When more developers join (expected in year 2–3), add
-`.github/CODEOWNERS` for `.github/`, `supabase/sql/`, and test files. Turn on
+`.github/CODEOWNERS` for `.github/`, `supabase/migrations/`, and test files. Turn on
 "Require review from Code Owners" in the branch ruleset.
 
 ## Live updates with Supabase Realtime
@@ -156,6 +156,11 @@ the env vars, walk through:
     check `/sites` (Overdue) and Activity ("Audit overdue: no new report for
     <site> in over 2 days"). The tick's answer in the Actions log lists the same
     sites under `watchdog.overdue`. Re-enable the workflow afterwards.
+20. Migration deploy: set the secrets `SUPABASE_ACCESS_TOKEN` and `SUPABASE_DB_PASSWORD`
+    and the variable `SUPABASE_PROJECT_REF`, and do the one-time repair (README). Run
+    "Supabase migrations" by hand: the dry-run step lists nothing pending, and the push
+    says the database is up to date. Then add a trivial migration and run it again to see
+    it listed and applied.
 
 ## Reopen a changes-requested gate at the same SHA
 
@@ -376,3 +381,36 @@ Built on the stub runner (#22). Out of this slice, or decided on the way:
   (canonical and sitemap on another site, and fetch errors in the sitemap and link messages). They
   are cut to one plain line, but the host name is site-controlled text. If that matters, give those
   findings a fixed message for prompts.
+
+## Prospects: follow-ups
+
+The quick check (`/prospects`) is built; these were left out on purpose or found on the way.
+
+- **Try it once for real.** On a phone, type a business's site, tap Check site, and confirm
+  you land on its site check within about 20 seconds and that it then appears under
+  Prospects. Then type one of your own registered sites: it opens its check but is not
+  listed under Prospects.
+- **A registered site's quick check is in neither list.** It is stored with no project (the
+  quick check never passes a registry id), so it is not under Your sites, and its address
+  matches the registry, so it is not under Prospects. It is still reachable from the check
+  it redirected to. Decide whether Your sites should show it.
+- **Private addresses are stored as "couldn't load".** The fetcher refuses them, so typing
+  `localhost` gives an unreachable report and a Prospects row. Refusing before the audit
+  needs the fetcher's address test exported.
+- **Deleting a prospect's reports** needs a database change, so it waits for #24.
+- **Share links, and full 25-page crawls from the app** (after #32), are out of scope.
+- **Worst-case time.** Each request is cut off at 8 seconds, but a quick check makes a dozen
+  or so. A slow host could pass the route's 60 seconds; the form then shows the plain failure
+  message. A real site took about 4 seconds when timed.
+
+## Local Supabase: follow-ups
+
+Found while setting up the local stack (`supabase/config.toml`).
+
+- `[db] major_version = 17` is the CLI's default. Run `show server_version;` on
+  production and match it, or a migration could pass locally and fail there.
+- In a mock-GitHub test, Auth also linked the seeded owner when the provider
+  reported that email as unverified. Real GitHub's primary email is verified, so
+  this is probably moot, but it is worth checking against the real app.
+- Add a CI job that runs `supabase start` and `supabase db reset` on every
+  pull request, so a migration that does not apply fails before the deploy.

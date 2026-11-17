@@ -17,7 +17,7 @@ const registry = new Map<string, { id: string; audits?: { url: string } }>([
 ]);
 jest.mock("@/lib/registry/cached", () => ({ getRegistry: async () => registry }));
 
-import { getSiteReport, listSites, SITES_SCAN_LIMIT } from "../queries";
+import { findReportId, getSiteReport, listProspects, listSites, PROSPECT_LIMIT, SITES_SCAN_LIMIT } from "../queries";
 
 const ID_A2 = "6f1c2b9e-4a3d-4c1e-9b7a-2d5e8f0a1b3c";
 const ID_A1 = "7a2d3c0f-5b4e-4d2f-8c8b-3e6f9a1b2c4d";
@@ -53,6 +53,8 @@ beforeEach(() => {
 describe.each([
   ["listSites", () => listSites(NOW)],
   ["getSiteReport", () => getSiteReport(ID_A1)],
+  ["listProspects", () => listProspects()],
+  ["findReportId", () => findReportId("https://zeta.example/", "2026-11-08T10:00:00.000Z")],
 ])("%s checks the owner first", (_name, call) => {
   it("queries nothing when requireOwner throws", async () => {
     const fake = createFakeSupabase();
@@ -108,6 +110,13 @@ describe("listSites", () => {
     expect(argsOf(reports, "limit")).toEqual([SITES_SCAN_LIMIT]);
   });
 
+  it("reads only reports with a project: the prospects (no project) are on their own page", async () => {
+    const fake = listFake([]);
+    await listSites(NOW);
+    const reports = fake.queries.find((q) => q.table === "audit_reports")!;
+    expect(argsOf(reports, "not")).toEqual(["project_id", "is", null]);
+  });
+
   it("looks up the projects of the registered sites only: registry entries with an audits block", async () => {
     const fake = listFake([]);
     await listSites(NOW);
@@ -146,11 +155,6 @@ describe("listSites", () => {
         projects,
       );
       expect((await listSites(NOW)).sites.map((s) => s.overdue)).toEqual([false, false]);
-    });
-
-    it("never marks a site that is not registered (a prospect posted with --url), however old", async () => {
-      listFake([withProject(row(ID_A1, "https://prospect.example/", daysAgo(40)), null)], projects);
-      expect((await listSites(NOW)).sites[0].overdue).toBe(false);
     });
 
     it("lists a registered site with no report at all, overdue only once it has been registered more than two days", async () => {
@@ -241,5 +245,111 @@ describe("getSiteReport", () => {
     const current = withReport(row(ID_A1, "https://zeta.example/", "2026-11-01T10:00:00+00:00"));
     withFake((q) => (argsOf(q, "maybeSingle") ? { data: current, error: null } : { data: null, error: { message: "timeout" } }));
     await expect(getSiteReport(ID_A1)).rejects.toThrow(/previous report\) failed: timeout/);
+  });
+});
+
+describe("listProspects", () => {
+  const ID = (n: number) => `${String(n).padStart(8, "0")}-aaaa-4aaa-8aaa-aaaaaaaaaaaa`;
+  const prospect = (n: number, target: string, startedAt: string) => row(ID(n), target, startedAt);
+
+  /** The two reads: summaries (no findings), then the full reports of the ids picked. */
+  function prospectsFake(summaries: unknown[]) {
+    return withFake((q) => {
+      if (argsOf(q, "in")) {
+        const ids = argsOf(q, "in")![1] as string[];
+        // Returned in no particular order, as the database may.
+        return { data: summaries.filter((r) => ids.includes((r as { id: string }).id)).reverse().map((r) => withReport(r as ReturnType<typeof row>)), error: null };
+      }
+      return { data: summaries, error: null };
+    });
+  }
+
+  it("is empty before any prospect is checked, and reads no reports then", async () => {
+    const fake = prospectsFake([]);
+    expect(await listProspects()).toEqual([]);
+    expect(fake.queries.filter((q) => q.table === "audit_reports")).toHaveLength(1);
+  });
+
+  it("reads only reports with no project, newest first, without the findings", async () => {
+    const fake = prospectsFake([]);
+    await listProspects();
+    const summaries = fake.queries.find((q) => q.table === "audit_reports")!;
+    expect(argsOf(summaries, "is")).toEqual(["project_id", null]);
+    expect(argsOf(summaries, "order")).toEqual(["started_at", { ascending: false }]);
+    expect(argsOf(summaries, "limit")).toEqual([SITES_SCAN_LIMIT]);
+    expect(argsOf(summaries, "select")![0]).not.toContain("report,");
+  });
+
+  it("keeps the newest report per address, newest first, with no project", async () => {
+    prospectsFake([
+      prospect(1, "https://beta.example/", "2026-11-12T10:00:00+00:00"),
+      prospect(2, "https://alpha.example/", "2026-11-11T10:00:00+00:00"),
+      prospect(3, "https://beta.example/", "2026-11-10T10:00:00+00:00"),
+    ]);
+    const list = await listProspects();
+    expect(list.map((r) => [r.id, r.target, r.projectId])).toEqual([
+      [ID(1), "https://beta.example/", null],
+      [ID(2), "https://alpha.example/", null],
+    ]);
+    expect(list[0].report.findings).toHaveLength(1);
+  });
+
+  it("leaves out an address that belongs to a registered site, www or not, so it is listed under Your sites only", async () => {
+    prospectsFake([
+      prospect(1, "https://denkore.com/", "2026-11-12T10:00:00+00:00"),
+      prospect(2, "https://www.ggrmusic.com/shows", "2026-11-12T09:00:00+00:00"),
+      prospect(3, "https://prospect.example/", "2026-11-12T08:00:00+00:00"),
+    ]);
+    expect((await listProspects()).map((r) => r.target)).toEqual(["https://prospect.example/"]);
+  });
+
+  it("does not leave out an address just because it is like a registered one", async () => {
+    prospectsFake([prospect(1, "https://www.denkore.org/", "2026-11-12T10:00:00+00:00")]);
+    expect((await listProspects()).map((r) => r.target)).toEqual(["https://www.denkore.org/"]);
+  });
+
+  it(`lists at most ${PROSPECT_LIMIT}, and fetches the findings of those only`, async () => {
+    const many = Array.from({ length: PROSPECT_LIMIT + 5 }, (_, i) => prospect(i + 1, `https://site${i}.example/`, `2026-11-12T10:${String(59 - i).padStart(2, "0")}:00+00:00`));
+    const fake = prospectsFake(many);
+    const list = await listProspects();
+    expect(list).toHaveLength(PROSPECT_LIMIT);
+    expect(list[0].id).toBe(ID(1));
+    const full = fake.queries.find((q) => argsOf(q, "in"))!;
+    expect((argsOf(full, "in")![1] as string[]).length).toBe(PROSPECT_LIMIT);
+    expect(argsOf(full, "select")![0]).toContain("report");
+  });
+
+  it("fails loudly when a listed report cannot be read back", async () => {
+    withFake((q) => (argsOf(q, "in") ? { data: [], error: null } : { data: [prospect(1, "https://beta.example/", "2026-11-12T10:00:00+00:00")], error: null }));
+    await expect(listProspects()).rejects.toThrow(/was listed but could not be read back/);
+  });
+
+  it("throws the database error, from either read", async () => {
+    withFake(() => ({ data: null, error: { code: "42501", message: "permission denied" } }));
+    await expect(listProspects()).rejects.toThrow(/listProspects failed: permission denied/);
+    withFake((q) => (argsOf(q, "in") ? { data: null, error: { message: "timeout" } } : { data: [prospect(1, "https://beta.example/", "2026-11-12T10:00:00+00:00")], error: null }));
+    await expect(listProspects()).rejects.toThrow(/listProspects \(reports\) failed: timeout/);
+  });
+});
+
+describe("findReportId", () => {
+  it("finds the report by address and start time", async () => {
+    const fake = withFake(() => ({ data: { id: ID_A1 }, error: null }));
+    expect(await findReportId("https://zeta.example/", "2026-11-08T10:00:00.000Z")).toBe(ID_A1);
+    const q = fake.queries[0];
+    expect(q.ops.filter((o) => o.method === "eq").map((o) => o.args)).toEqual([
+      ["target", "https://zeta.example/"],
+      ["started_at", "2026-11-08T10:00:00.000Z"],
+    ]);
+  });
+
+  it("throws when the stored report cannot be read back", async () => {
+    withFake(() => ({ data: null, error: null }));
+    await expect(findReportId("https://zeta.example/", "2026-11-08T10:00:00.000Z")).rejects.toThrow(/cannot be read back/);
+  });
+
+  it("throws the database error", async () => {
+    withFake(() => ({ data: null, error: { message: "permission denied" } }));
+    await expect(findReportId("https://zeta.example/", "2026-11-08T10:00:00.000Z")).rejects.toThrow(/findReportId failed: permission denied/);
   });
 });
