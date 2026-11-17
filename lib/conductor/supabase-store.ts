@@ -4,7 +4,7 @@
  * DELIBERATE: this uses the secret-key client from lib/supabase/admin, which
  * acts as the service_role Postgres role. The Conductor is a machine caller:
  * it writes run state, steps, gates and events that the owner's role cannot.
- * It still cannot write approvals; only the owner can (see 002_rls.sql).
+ * It still cannot write approvals; only the owner can (see supabase/migrations/…_rls.sql).
  *
  * Pages and server actions never import this file. They reach it only by
  * calling advanceRun (lib/conductor/advance.ts), usually inside after().
