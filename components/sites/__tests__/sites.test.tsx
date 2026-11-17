@@ -5,6 +5,8 @@ import { auditReport, DENKORE_TARGET, denkoreFindings, findings } from "@/test-u
 import { SiteList } from "../site-list";
 import { SiteReport } from "../site-report";
 
+jest.mock("@/app/(app)/sites/[id]/actions", () => ({ fixWithConductorAction: jest.fn() }));
+
 const ID = "6f1c2b9e-4a3d-4c1e-9b7a-2d5e8f0a1b3c";
 
 function stored(list = [findings.noTitle], startedAt = "2026-11-08T10:00:00.000Z"): StoredReport {

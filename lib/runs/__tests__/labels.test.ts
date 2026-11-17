@@ -27,6 +27,19 @@ describe("eventKindLabel", () => {
   });
 });
 
+describe("site fix events", () => {
+  it("labels the click and the verification, and says which report verified", () => {
+    expect(eventKindLabel("audit.fix_requested")).toBe("Fix started from a site report");
+    expect(eventKindLabel("audit.fix_verified")).toBe("Verified by a later audit report");
+    expect(eventDescription("audit.fix_verified", { report_id: "r", report_started_at: "2026-11-14T10:00:00.000Z" })).toBe("Verified by report Nov 14, 2026, 5:00 AM ET");
+  });
+
+  it("falls back to the plain label when the report's date is missing or not a date", () => {
+    expect(eventDescription("audit.fix_verified", {})).toBe("Verified by a later audit report");
+    expect(eventDescription("audit.fix_verified", { report_started_at: "soon" })).toBe("Verified by a later audit report");
+  });
+});
+
 describe("eventDescription and actorLabel", () => {
   it("names the new stage for state changes", () => {
     expect(eventDescription("run.state_changed", { from: "queued", to: "spec" })).toBe("Now: Writing the plan");

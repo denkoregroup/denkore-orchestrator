@@ -1,8 +1,9 @@
 import { randomUUID } from "node:crypto";
+import { FIX_REQUESTED_EVENT, isAuditFixPrompt } from "@/lib/audit-fixes/prompt";
 import { isTerminal, type GateKind, type RunState } from "@/lib/state-machine";
 import type { StepName } from "@/lib/step-runner/types";
 import { STEP_TIMED_OUT_EVENT, type ConductorStore, type InsertResult } from "./store";
-import type { GateDecision, GateStatus, RunSnapshot, StepSnapshot } from "./types";
+import type { FixSnapshot, GateDecision, GateStatus, RunSnapshot, StepSnapshot } from "./types";
 
 /**
  * In-memory ConductorStore for tests. It mimics the database's unique keys
@@ -45,6 +46,8 @@ export class MemoryConductorStore implements ConductorStore {
   readonly steps: Array<StepSnapshot & { runId: string }> = [];
   readonly gates: MemoryGate[] = [];
   readonly events: MemoryEvent[] = [];
+  /** Audit reports, standing in for audit_reports: the first one for a run's project after its post-deploy check began counts. */
+  readonly reports: Array<{ id: string; registryId: string | null; startedAt: string; findingIds: string[] }> = [];
   private clock = Date.parse("2026-10-30T10:00:00.000Z");
 
   /** A monotonic clock, shared with the executor through `now`. */
@@ -71,6 +74,18 @@ export class MemoryConductorStore implements ConductorStore {
       prompt: input.prompt ?? "Build the booking page",
       registryId: input.registryId === undefined ? "example-app" : input.registryId,
     });
+    return id;
+  }
+
+  /** What the click on Fix with Conductor leaves behind: the ids of the findings the run was started for. */
+  requestFix(runId: string, findingIds: string[]): void {
+    this.events.push({ runId, kind: FIX_REQUESTED_EVENT, payload: { report_id: "report", severity: "warn", finding_ids: findingIds } });
+  }
+
+  /** An audit report for a site, made now (so later than everything already recorded). Returns its id. */
+  addReport(input: { findingIds: string[]; registryId?: string | null }): string {
+    const id = randomUUID();
+    this.reports.push({ id, registryId: input.registryId === undefined ? "example-app" : input.registryId, startedAt: this.now(), findingIds: input.findingIds });
     return id;
   }
 
@@ -114,6 +129,21 @@ export class MemoryConductorStore implements ConductorStore {
       timedOutStepKeys: this.events
         .filter((e) => e.runId === runId && e.kind === STEP_TIMED_OUT_EVENT)
         .map((e) => String(e.payload.step_key)),
+      fix: isAuditFixPrompt(run.prompt) ? this.fixOf(run) : null,
+    };
+  }
+
+  private fixOf(run: MemoryRun): FixSnapshot {
+    const requested = this.events.find((e) => e.runId === run.id && e.kind === FIX_REQUESTED_EVENT);
+    const next =
+      run.state === "post_deploy_check"
+        ? this.reports
+            .filter((r) => r.registryId === run.registryId && Date.parse(r.startedAt) > Date.parse(run.updatedAt))
+            .sort((a, b) => Date.parse(a.startedAt) - Date.parse(b.startedAt))[0]
+        : undefined;
+    return {
+      findingIds: requested && Array.isArray(requested.payload.finding_ids) ? requested.payload.finding_ids.map(String) : null,
+      nextReport: next ? { id: next.id, startedAt: next.startedAt, findingIds: next.findingIds } : null,
     };
   }
 
