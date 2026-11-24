@@ -71,6 +71,8 @@ says who owns it: a dedicated session or the conductor's scheduled run.
   happened; security and URL safety done properly. (Example: contact-form rate limiting was
   deferred, because an in-memory counter doesn't hold across serverless instances and no spam has
   been seen.)
+- **READMEs stay high level:** what it is, how to run it, where things are. Detail goes in a
+  linked doc under `docs/`.
 - **Reporting style:** product-owner level, short and incremental. Technical detail only when
   David asks.
 - **Link every issue and PR you mention,** as a markdown link with its title or a few words, for
