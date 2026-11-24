@@ -5,7 +5,8 @@ import type { Finding } from "@/lib/audits/types";
 import { auditReport, DENKORE_TARGET, denkoreFindings, findings } from "@/test-utils/site-reports";
 
 // The layout's own children are other tests' business; here only the print hooks matter.
-jest.mock("@/components/nav", () => ({ Nav: () => <nav aria-label="Main">nav</nav> }));
+jest.mock("next/navigation", () => ({ usePathname: () => "/sites" }));
+jest.mock("@/components/hub/waiting-count", () => ({ WaitingCount: () => null }));
 jest.mock("@/app/(app)/sites/[id]/actions", () => ({ fixWithConductorAction: jest.fn() }));
 jest.mock("@/components/owner-badge", () => ({ OwnerBadge: () => <button type="button">Sign out</button> }));
 
@@ -14,8 +15,12 @@ import { SiteReport } from "@/components/sites/site-report";
 
 describe("printing a report (Save as PDF)", () => {
   it("hides the nav and the header with its sign-out button", () => {
-    const { container } = render(<AppLayout params={Promise.resolve({})}>{<p>report</p>}</AppLayout>);
-    expect(screen.getByRole("navigation").closest("aside")).toHaveClass("print:hidden");
+    const { container } = render(
+      <AppLayout params={Promise.resolve({})} summary={null}>
+        {<p>report</p>}
+      </AppLayout>,
+    );
+    expect(screen.getByRole("navigation", { name: "Main" })).toHaveClass("print:hidden");
     expect(container.querySelector("header")).toHaveClass("print:hidden");
     expect(container.querySelector("header")).toContainElement(screen.getByRole("button", { name: "Sign out" }));
     // The page itself is not hidden, and loses its padding on paper.

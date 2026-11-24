@@ -17,15 +17,20 @@ export function projectStatuses(data: WaitingData, reports: LatestRunReport[]): 
   return [...counts.entries()].map(([project, needsYou]) => ({ project, needsYou })).sort((a, b) => a.project.localeCompare(b.project));
 }
 
+/** Everything waiting on you across the projects: the hub's one big number. */
+export function waitingCount(data: WaitingData, reports: LatestRunReport[]) {
+  return projectStatuses(data, reports).reduce((n, p) => n + p.needsYou, 0);
+}
+
 /**
- * Night Harbor's header: the one teal glow, the count of things waiting on you as one big number,
- * and a small dark tile per project. Teal means it needs you.
+ * Night Harbor's summary, inside the header's teal glow on Waiting on you: the count of things
+ * waiting on you as one big number, and a small dark tile per project. Teal means it needs you.
  */
-export function HarborHeader({ now, data, reports }: { now: string; data: WaitingData; reports: LatestRunReport[] }) {
+export function HarborSummary({ now, data, reports }: { now: string; data: WaitingData; reports: LatestRunReport[] }) {
   const projects = projectStatuses(data, reports);
   const waiting = projects.reduce((n, p) => n + p.needsYou, 0);
   return (
-    <header className="harbor-header -mx-4 -mt-6 px-5 pt-6 pb-5 md:mx-0 md:mt-0 md:rounded-[14px]">
+    <div className="mt-4">
       <div className="flex items-baseline justify-between gap-3 text-xs text-muted">
         <h1 className="order-last font-medium text-accent">Waiting on you</h1>
         <EtTime iso={now} />
@@ -46,6 +51,6 @@ export function HarborHeader({ now, data, reports }: { now: string; data: Waitin
           ))}
         </ul>
       )}
-    </header>
+    </div>
   );
 }

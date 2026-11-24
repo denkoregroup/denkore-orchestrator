@@ -297,7 +297,7 @@ describe("/check/[reportId]", () => {
 
 describe("the layout", () => {
   it("wraps the page in the check's own dark, flat frame, with no app navigation", () => {
-    const { container } = render(<CheckLayout params={Promise.resolve({})}>{<p>page</p>}</CheckLayout>);
+    const { container } = render(<CheckLayout>{<p>page</p>}</CheckLayout>);
     expect(container.firstElementChild).toHaveClass("site-check", "bg-check-bg");
     expect(screen.queryByRole("navigation")).toBeNull();
   });

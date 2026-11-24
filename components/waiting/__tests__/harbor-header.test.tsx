@@ -2,7 +2,7 @@ import { render, screen, within } from "@testing-library/react";
 import type { LatestRunReport } from "@/lib/data/run-reports";
 import type { WaitingData, WaitingPull } from "@/lib/data/waiting";
 import { runReport } from "@/test-utils/run-reports";
-import { HarborHeader, projectStatuses } from "../harbor-header";
+import { HarborSummary, projectStatuses, waitingCount } from "../harbor-header";
 
 const NOW = "2026-11-24T23:45:00.000Z";
 
@@ -41,14 +41,18 @@ describe("projectStatuses", () => {
     ]);
   });
 
+  it("adds them up for the switch's Waiting count", () => {
+    expect(waitingCount(data([pull({}), pull({ number: 8 })]), [latest()])).toBe(4);
+  });
+
   it("works when GitHub isn't connected", () => {
     expect(projectStatuses({ configured: false }, [latest({ decisions: [] })])).toEqual([{ project: "honeybees", needsYou: 0 }]);
   });
 });
 
-describe("HarborHeader", () => {
+describe("HarborSummary", () => {
   it("shows the page name, the time, one big count, and a tile per project", () => {
-    render(<HarborHeader now={NOW} data={data([pull({})])} reports={[latest({ decisions: [] })]} />);
+    render(<HarborSummary now={NOW} data={data([pull({})])} reports={[latest({ decisions: [] })]} />);
     expect(screen.getByRole("heading", { level: 1, name: "Waiting on you" })).toHaveClass("text-accent");
     expect(screen.getByText("Nov 24, 2026, 6:45 PM ET")).toBeVisible();
     const count = screen.getByText("1", { selector: "span" });
@@ -61,7 +65,7 @@ describe("HarborHeader", () => {
   });
 
   it("shows zero and no tiles when nothing has reported", () => {
-    render(<HarborHeader now={NOW} data={{ configured: false }} reports={[]} />);
+    render(<HarborSummary now={NOW} data={{ configured: false }} reports={[]} />);
     expect(screen.getByText("0", { selector: "span" })).toBeVisible();
     expect(screen.queryByRole("list", { name: "Your projects" })).toBeNull();
   });
