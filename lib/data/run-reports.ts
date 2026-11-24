@@ -2,6 +2,7 @@ import "server-only";
 import { z } from "zod";
 import { requireOwner } from "@/lib/auth";
 import { RUN_ANSWERED_EVENT, answerPayloadSchema } from "@/lib/run-reports/answers";
+import { reviewKey, type PullVerdicts } from "@/lib/run-reports/reviews";
 import { runReportSchema, type RunReport } from "@/lib/run-reports/schema";
 import { createClient } from "@/lib/supabase/server";
 import { parseRows, queryError } from "./rows";
@@ -9,6 +10,8 @@ import { parseRows, queryError } from "./rows";
 /** Reports older than this are left off the Waiting on you page. */
 export const RUN_REPORT_WINDOW_DAYS = 7;
 const MAX_ROWS = 100;
+/** The Conductor review's reports; the repo runs' reports are every other mode. */
+const REVIEW_MODE = "review";
 
 const runReportRow = z.object({
   id: z.uuid(),
@@ -45,6 +48,7 @@ export async function getLatestRunReports(now: Date = new Date()): Promise<Lates
   const { data, error } = await db
     .from("run_reports")
     .select("id, registry_id, received_at, report")
+    .neq("mode", REVIEW_MODE)
     .gte("started_at", since)
     .order("started_at", { ascending: false })
     .limit(MAX_ROWS);
@@ -77,6 +81,34 @@ export async function getLatestRunReports(now: Date = new Date()): Promise<Lates
   );
 }
 
+/**
+ * The newest Conductor review verdict on each PR from the last week. A PR the newest review
+ * didn't cover keeps its verdict from an earlier one, which the page uses only while the PR's
+ * head is the commit that was reviewed.
+ */
+export async function getPullVerdicts(now: Date = new Date()): Promise<PullVerdicts> {
+  await requireOwner();
+  const since = new Date(now.getTime() - RUN_REPORT_WINDOW_DAYS * 24 * 60 * 60 * 1000).toISOString();
+  const db = await createClient();
+  const { data, error } = await db
+    .from("run_reports")
+    .select("id, registry_id, received_at, report")
+    .eq("mode", REVIEW_MODE)
+    .gte("started_at", since)
+    .order("started_at", { ascending: false })
+    .limit(MAX_ROWS);
+  if (error) throw queryError("getPullVerdicts", error);
+
+  const verdicts: PullVerdicts = {};
+  for (const { report } of parseRows(runReportRow, data, "run_reports")) {
+    for (const pull of report.pulls) {
+      const key = reviewKey(report.repo, pull.number);
+      if (pull.review && !(key in verdicts)) verdicts[key] = { ...pull.review, reviewedAt: report.finishedAt };
+    }
+  }
+  return verdicts;
+}
+
 /** The newest report from one project's runs, whatever its age; null when there is none. */
 export async function getNewestRunReport(registryId: string): Promise<{ id: string; report: RunReport } | null> {
   await requireOwner();
@@ -85,6 +117,7 @@ export async function getNewestRunReport(registryId: string): Promise<{ id: stri
     .from("run_reports")
     .select("id, registry_id, received_at, report")
     .eq("registry_id", registryId)
+    .neq("mode", REVIEW_MODE)
     .order("started_at", { ascending: false })
     .limit(1);
   if (error) throw queryError("getNewestRunReport", error);

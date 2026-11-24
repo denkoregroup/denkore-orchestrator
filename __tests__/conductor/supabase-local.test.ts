@@ -13,18 +13,19 @@ import { auditReportSchema } from "../../lib/audits/types";
 const root = process.cwd();
 const read = (...p: string[]) => readFileSync(path.join(root, ...p), "utf8");
 
-// sha256 of supabase/sql/001-005 as they were when production applied them. A migration that has
-// been applied is never edited: add a new one instead.
+// sha256 of each migration as it was when production applied it. A migration that has been applied
+// is never edited: add a new one instead.
 const MIGRATIONS: Array<[string, string]> = [
   ["20261113000001_tables.sql", "1e3a08722de64dd41b1c7eea5ceaa818b1c5f833e36e224f07f5e49922f0131c"],
   ["20261113000002_rls.sql", "b3433d2293284a88ad0a05c727c261186122f35bfc29fafef0a7f933838bd3ec"],
   ["20261113000003_functions.sql", "be5c7a790ae8ad3b69a6c8e2b5a3e91892bf18469729f3971d2c23518ea09211"],
   ["20261113000004_registry_and_audit.sql", "01bc68a75f6745381ad358276e8a1e62130095d7ce06dd80e722ca8ccd1bfb6b"],
   ["20261113000005_audit_reports.sql", "6b35b322a0106b0c8dfc5e0738ce60925f5a2596ecb29a25988593ac57ad5096"],
+  ["20261124000006_run_reports.sql", "042ed3512fa83071be5e63589a5c66d734b61b0ba9f6a3f4b11dc4834ff6580e"],
 ];
 
 describe("supabase/migrations", () => {
-  it("holds 001-005 unchanged, in the original order, then anything newer", () => {
+  it("holds the applied migrations unchanged, in the original order, then anything newer", () => {
     const files = readdirSync(path.join(root, "supabase", "migrations")).sort();
     expect(files.slice(0, MIGRATIONS.length)).toEqual(MIGRATIONS.map(([f]) => f));
     for (const [file, sha] of MIGRATIONS) {

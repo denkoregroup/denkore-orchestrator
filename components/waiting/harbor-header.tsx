@@ -1,19 +1,27 @@
 import { EtTime } from "@/components/sites/et-time";
 import type { LatestRunReport } from "@/lib/data/run-reports";
-import type { WaitingData } from "@/lib/data/waiting";
+import type { WaitingData, WaitingPull } from "@/lib/data/waiting";
+import { currentVerdict, type PullVerdicts } from "@/lib/run-reports/reviews";
 
 export interface ProjectStatus {
   project: string;
-  /** Unanswered run decisions plus pull requests ready for your yes. */
+  /** Unanswered run decisions plus pull requests ready for your yes or your eyes. */
   needsYou: number;
 }
 
+/** A PR needs you when the review asks for your eyes, or it's ready and the review didn't send it back. */
+function pullNeedsYou(pull: WaitingPull, verdicts: PullVerdicts) {
+  const verdict = currentVerdict(verdicts, pull)?.verdict;
+  if (verdict === "needs-david") return true;
+  return pull.stage === "ready" && verdict !== "changes-needed";
+}
+
 /** Each project with a recent run or an agent pull request, and how many things in it wait on you. */
-export function projectStatuses(data: WaitingData, reports: LatestRunReport[]): ProjectStatus[] {
+export function projectStatuses(data: WaitingData, reports: LatestRunReport[], verdicts: PullVerdicts = {}): ProjectStatus[] {
   const counts = new Map<string, number>();
   const add = (project: string, n: number) => counts.set(project, (counts.get(project) ?? 0) + n);
   for (const r of reports) add(r.report.registryId, r.report.decisions.filter((d) => !r.answers[d.number]).length);
-  if (data.configured) for (const p of data.pulls) if (p.byAgent) add(p.project, p.stage === "ready" ? 1 : 0);
+  if (data.configured) for (const p of data.pulls) if (p.byAgent) add(p.project, pullNeedsYou(p, verdicts) ? 1 : 0);
   return [...counts.entries()].map(([project, needsYou]) => ({ project, needsYou })).sort((a, b) => a.project.localeCompare(b.project));
 }
 
@@ -21,8 +29,18 @@ export function projectStatuses(data: WaitingData, reports: LatestRunReport[]): 
  * Night Harbor's header: the one teal glow, the count of things waiting on you as one big number,
  * and a small dark tile per project. Teal means it needs you.
  */
-export function HarborHeader({ now, data, reports }: { now: string; data: WaitingData; reports: LatestRunReport[] }) {
-  const projects = projectStatuses(data, reports);
+export function HarborHeader({
+  now,
+  data,
+  reports,
+  verdicts = {},
+}: {
+  now: string;
+  data: WaitingData;
+  reports: LatestRunReport[];
+  verdicts?: PullVerdicts;
+}) {
+  const projects = projectStatuses(data, reports, verdicts);
   const waiting = projects.reduce((n, p) => n + p.needsYou, 0);
   return (
     <header className="harbor-header -mx-4 -mt-6 px-5 pt-6 pb-5 md:mx-0 md:mt-0 md:rounded-[14px]">

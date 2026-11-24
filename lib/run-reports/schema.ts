@@ -10,13 +10,30 @@ import { z } from "zod";
 
 const text = (max: number) => z.string().trim().min(1).max(max);
 
-export const RUN_MODES = ["finish-only", "may-start"] as const;
+/** "review" is the Conductor review's report: a verdict on each PR, and no decisions. */
+export const RUN_MODES = ["finish-only", "may-start", "review"] as const;
 export const PR_CHECKS = ["passing", "failing", "running", "none"] as const;
 
 /** A Claude session address, the only kind of link a report may carry. */
 const sessionUrl = z
   .url({ protocol: /^https$/, hostname: /^claude\.ai$/ })
   .refine((u) => new URL(u).pathname.startsWith("/code/"), "must be a claude.ai/code session address");
+
+/** The Conductor review's classes (docs/agents/review-rules.md). */
+export const REVIEW_VERDICTS = ["ready", "needs-david", "changes-needed"] as const;
+
+export const pullReviewSchema = z
+  .strictObject({
+    verdict: z.enum(REVIEW_VERDICTS),
+    /** What to look at, or what has to change. Required unless the PR is ready. */
+    reason: text(300).optional(),
+    /** The commit the verdict is about. A PR pushed since then counts as not reviewed. */
+    headSha: z.string().regex(/^[0-9a-f]{40}$/, "a full commit sha"),
+  })
+  .refine((r) => r.verdict === "ready" || r.reason !== undefined, {
+    path: ["reason"],
+    message: "say what to look at or what has to change",
+  });
 
 export const runReportPullSchema = z.strictObject({
   number: z.number().int().positive(),
@@ -26,6 +43,8 @@ export const runReportPullSchema = z.strictObject({
   checks: z.enum(PR_CHECKS),
   /** The run's view: true when it's ready for David's merge. */
   ready: z.boolean(),
+  /** Only in a review report: the Conductor review's verdict on this PR. */
+  review: pullReviewSchema.optional(),
 });
 
 export const runReportDecisionSchema = z.strictObject({
@@ -60,8 +79,19 @@ export const runReportSchema = z
   .refine((r) => new Set(r.decisions.map((d) => d.number)).size === r.decisions.length, {
     path: ["decisions"],
     message: "decision numbers must be unique",
+  })
+  // A review report carries a verdict on every PR and asks nothing; a repo run's report carries no verdicts.
+  .refine((r) => r.pulls.every((p) => (p.review !== undefined) === (r.mode === "review")), {
+    path: ["pulls"],
+    message: "a review report has a verdict on every PR, and only a review report has verdicts",
+  })
+  .refine((r) => r.mode !== "review" || r.decisions.length === 0, {
+    path: ["decisions"],
+    message: "a review report has no numbered decisions",
   });
 
 export type RunReport = z.infer<typeof runReportSchema>;
 export type RunReportPull = z.infer<typeof runReportPullSchema>;
 export type RunReportDecision = z.infer<typeof runReportDecisionSchema>;
+export type PullReview = z.infer<typeof pullReviewSchema>;
+export type ReviewVerdict = (typeof REVIEW_VERDICTS)[number];

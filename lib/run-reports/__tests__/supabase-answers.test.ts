@@ -43,6 +43,7 @@ describe("SupabaseRunAnswerStore", () => {
     });
     const [reports, events] = fake.queries;
     expect(argsOf(reports, "eq")).toEqual(["registry_id", "honeybees"]);
+    expect(argsOf(reports, "neq")).toEqual(["mode", "review"]);
     expect(argsOf(reports, "order")).toEqual(["started_at", { ascending: false }]);
     expect(events.table).toBe("events");
     expect(events.ops.filter((o) => o.method === "eq").map((o) => o.args)).toEqual([

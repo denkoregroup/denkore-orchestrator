@@ -23,3 +23,36 @@ export function runReport(overrides: Partial<RunReport> = {}): RunReport {
     ...overrides,
   };
 }
+
+export const REVIEWED_SHA = "a".repeat(40);
+
+/** A valid Conductor review report on two HoneyBee PRs. Override any field. */
+export function reviewReport(overrides: Partial<RunReport> = {}): RunReport {
+  return runReport({
+    mode: "review",
+    startedAt: "2026-11-25T00:37:00.000Z",
+    finishedAt: "2026-11-25T00:55:00.000Z",
+    summary: "Reviewed two PRs: one ready, one needs your eyes on the preview.",
+    pulls: [
+      {
+        number: 51,
+        title: "Cart badge counts items",
+        what: "The cart icon shows how many items are in the cart",
+        checks: "passing",
+        ready: true,
+        review: { verdict: "ready", headSha: REVIEWED_SHA },
+      },
+      {
+        number: 52,
+        title: "Shipping page",
+        what: "A page with shipping times and costs",
+        checks: "passing",
+        ready: false,
+        review: { verdict: "needs-david", reason: "Check the shipping times against Sarah's text", headSha: "b".repeat(40) },
+      },
+    ],
+    notes: [],
+    decisions: [],
+    ...overrides,
+  });
+}

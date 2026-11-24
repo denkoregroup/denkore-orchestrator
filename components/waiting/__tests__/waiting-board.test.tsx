@@ -1,5 +1,6 @@
 import { render, screen, within } from "@testing-library/react";
 import type { WaitingPull } from "@/lib/data/waiting";
+import type { PullVerdicts } from "@/lib/run-reports/reviews";
 import { WaitingBoard } from "../waiting-board";
 
 const base: WaitingPull = {
@@ -115,5 +116,64 @@ describe("WaitingBoard", () => {
     );
     expect(screen.getByText("Adds an agent guide so every session follows the same rules. Docs only, no risk to the site.")).toBeVisible();
     expect(screen.getAllByText("No summary in this pull request yet.")).toHaveLength(1);
+  });
+
+  describe("with the Conductor review's verdicts", () => {
+    const SHA = "a".repeat(40);
+    const pr = (number: number, over: Partial<WaitingPull> = {}): WaitingPull => ({
+      ...base,
+      number,
+      title: `PR ${number}`,
+      headSha: SHA,
+      url: `https://github.com/denkoregroup/honeybees/pull/${number}`,
+      ...over,
+    });
+    const reviewed = (verdicts: PullVerdicts, pulls: WaitingPull[]) =>
+      render(<WaitingBoard data={{ configured: true, pulls, unreadable: [], notShared: [], projectCount: 3 }} verdicts={verdicts} />);
+    const at = "2026-11-25T00:55:00.000Z";
+
+    it("puts look closer first with what to look at, then blocked, then ready to merge on one line", () => {
+      reviewed(
+        {
+          "denkoregroup/honeybees#1": { verdict: "ready", headSha: SHA, reviewedAt: at },
+          "denkoregroup/honeybees#2": { verdict: "needs-david", reason: "Check the hero copy on the preview", headSha: SHA, reviewedAt: at },
+          "denkoregroup/honeybees#3": { verdict: "changes-needed", reason: "The cart test fails", headSha: SHA, reviewedAt: at },
+          "denkoregroup/honeybees#4": { verdict: "ready", headSha: SHA, reviewedAt: at },
+        },
+        [pr(1), pr(2), pr(3, { stage: "needs_fix", checks: "failing" }), pr(4), pr(5)],
+      );
+
+      const headings = screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent);
+      expect(headings).toEqual(["Look closer (1)", "Blocked (1)", "Ready to merge (2)", "Ready for your yes (1)"]);
+
+      const closer = screen.getByRole("region", { name: "Look closer (1)" });
+      expect(within(closer).getByRole("link", { name: "#2 PR 2" })).toBeVisible();
+      expect(within(closer).getByText("Check the hero copy on the preview").closest("p")).toHaveTextContent("Look at: Check the hero copy on the preview");
+
+      const blocked = screen.getByRole("region", { name: "Blocked (1)" });
+      expect(within(blocked).getByText("The cart test fails").closest("p")).toHaveTextContent("Needs: The cart test fails");
+
+      const ready = screen.getByRole("region", { name: "Ready to merge (2)" });
+      expect(within(ready).getAllByRole("link").map((l) => [l.textContent, l.getAttribute("href")])).toEqual([
+        ["honeybees #1", "https://github.com/denkoregroup/honeybees/pull/1"],
+        ["honeybees #4", "https://github.com/denkoregroup/honeybees/pull/4"],
+      ]);
+      expect(within(ready).queryByRole("listitem")).toBeNull();
+
+      // #5 has no verdict, so it shows by its GitHub state.
+      expect(within(screen.getByRole("region", { name: "Ready for your yes (1)" })).getByRole("link", { name: "#5 PR 5" })).toBeVisible();
+    });
+
+    it("ignores a verdict on a commit the PR has moved past", () => {
+      reviewed({ "denkoregroup/honeybees#1": { verdict: "needs-david", reason: "Look", headSha: "b".repeat(40), reviewedAt: at } }, [pr(1)]);
+      expect(screen.queryByRole("region", { name: /Look closer/ })).toBeNull();
+      expect(screen.getByRole("region", { name: "Ready for your yes (1)" })).toBeVisible();
+    });
+
+    it("doesn't call a PR ready to merge when GitHub says a check failed since", () => {
+      reviewed({ "denkoregroup/honeybees#1": { verdict: "ready", headSha: SHA, reviewedAt: at } }, [pr(1, { stage: "needs_fix", checks: "failing" })]);
+      expect(screen.queryByRole("region", { name: /Ready to merge/ })).toBeNull();
+      expect(screen.getByRole("region", { name: "Needs a fix first (1)" })).toBeVisible();
+    });
   });
 });
