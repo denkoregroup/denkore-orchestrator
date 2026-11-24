@@ -21,7 +21,7 @@ const sessionUrl = z
 export const runReportPullSchema = z.strictObject({
   number: z.number().int().positive(),
   title: text(200),
-  /** What the PR does, product-owner level. */
+  /** The PR's Summary line: what it does for David and how risky it is. */
   what: text(300),
   checks: z.enum(PR_CHECKS),
   /** The run's view: true when it's ready for David's merge. */

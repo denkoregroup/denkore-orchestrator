@@ -44,7 +44,8 @@ Report (SendUserMessage, then a push notification only if a decision is waiting)
     schemaVersion 1; registryId (REPO's id in registry/); repo "denkoregroup/REPO"; mode;
     startedAt and finishedAt (ISO 8601 with offset); summary (one or two sentences);
     sessionUrl (this session's claude.ai/code address, only if you know it); pulls
-    [{number, title, what, checks: passing|failing|running|none, ready: true|false}];
+    [{number, title, what (the PR's Summary line), checks: passing|failing|running|none,
+    ready: true|false}];
     notes [three or fewer]; decisions [{number, question, options? [short answers]}].
 
 Never: merge, mark ready, change a live system, create issues, or contact the client. David
