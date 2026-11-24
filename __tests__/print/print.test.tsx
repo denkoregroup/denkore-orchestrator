@@ -6,6 +6,7 @@ import { auditReport, DENKORE_TARGET, denkoreFindings, findings } from "@/test-u
 
 // The layout's own children are other tests' business; here only the print hooks matter.
 jest.mock("@/components/nav", () => ({ Nav: () => <nav aria-label="Main">nav</nav> }));
+jest.mock("@/app/(app)/sites/[id]/actions", () => ({ fixWithConductorAction: jest.fn() }));
 jest.mock("@/components/owner-badge", () => ({ OwnerBadge: () => <button type="button">Sign out</button> }));
 
 import AppLayout from "@/app/(app)/layout";

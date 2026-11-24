@@ -30,6 +30,15 @@ Put the local block from `.env.example` in `.env.local`. The seed creates the ow
 
 The first GitHub sign-in links to the seeded owner by email, so the GitHub account's **primary, verified** email must be the seeded one. Any other email is refused with `signup_disabled` (sign-ups are off). If yours differs, set `enable_signup = true` in `supabase/config.toml` once, sign in, set `DENKORE_OWNER_USER_ID` in `.env.local` to the new user's id (Studio at `http://127.0.0.1:54323`, Authentication), and set it back to `false`. A reset removes that user, so repeat after one.
 
+### Try a Fix with Conductor run locally
+
+The runner is a stub until #32, so nothing is built or deployed; you post each step's completion by hand. Use the local database (above), with `pnpm dev` running.
+
+1. `pnpm registry:sync`, then `pnpm audit:run --project denkore-com --post http://localhost:3000/api/audits/report` to store a report for a registered site.
+2. Open it under Sites and press **Fix with Conductor**. The new run is under Runs; its id is in the address.
+3. Post each step with `pnpm conductor:simulate --url http://localhost:3000 --run <id> --step <step>`: `build_test`, then `verify`. Approve the release gate under Approvals, then post `deploy`.
+4. The run now waits for a **later** audit report. Run step 1's audit command again, then trigger a tick (a signed `POST` to `/api/conductor/tick`; the production schedule does this every 5 minutes). On the stub nothing was fixed, so the run ends escalated: that is the expected result.
+
 ## One-time setup
 
 **Supabase**
@@ -89,6 +98,7 @@ CI runs typecheck, lint and tests on every pull request.
 | `components/site-check/` | The site check view and its QR code |
 | `lib/github/` | Reads open pull requests and their check runs from GitHub (`/waiting`) |
 | `lib/run-reports/` | What a scheduled Duet run reports when it finishes (PRs, notes, numbered decisions): the schema and the signed route that stores it. Runs send it through the **Run report** workflow, which signs it, so they never hold the secret |
+| `lib/audit-fixes/` | Fix with Conductor on a site report: what can be fixed in code (`lib/audits/checks/catalog.ts`), the run's prompt, and the buttons |
 | `lib/site-health/` | Stored audit reports, what changed between two of them, and the missed-run watchdog the tick runs |
 | `supabase/` | Migrations (schema, RLS, triggers), the local seed and the local stack config |
 | `registry/` | One YAML file per project |
