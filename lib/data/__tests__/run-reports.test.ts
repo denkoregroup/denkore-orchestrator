@@ -2,14 +2,14 @@
  * @jest-environment node
  */
 import { argsOf, createFakeSupabase, type FakeQuery } from "@/test-utils/fake-supabase";
-import { runReport } from "@/test-utils/run-reports";
+import { REVIEWED_SHA, reviewReport, runReport } from "@/test-utils/run-reports";
 
 const requireOwner = jest.fn();
 const createClient = jest.fn();
 jest.mock("@/lib/auth", () => ({ requireOwner: () => requireOwner() }));
 jest.mock("@/lib/supabase/server", () => ({ createClient: () => createClient() }));
 
-import { getLatestRunReports, getNewestRunReport } from "../run-reports";
+import { getLatestRunReports, getNewestRunReport, getPullVerdicts } from "../run-reports";
 
 const NOW = new Date("2026-11-24T20:00:00Z");
 
@@ -39,6 +39,12 @@ describe("getLatestRunReports", () => {
     expect(q.table).toBe("run_reports");
     expect(argsOf(q, "gte")).toEqual(["started_at", "2026-11-17T20:00:00.000Z"]);
     expect(argsOf(q, "order")).toEqual(["started_at", { ascending: false }]);
+  });
+
+  it("leaves out the Conductor review's reports", async () => {
+    const fake = withRows([]);
+    await getLatestRunReports(NOW);
+    expect(argsOf(fake.queries[0], "neq")).toEqual(["mode", "review"]);
   });
 
   it("keeps each project's newest run, and puts runs with decisions first", async () => {
@@ -105,6 +111,7 @@ describe("getNewestRunReport", () => {
     const q = fake.queries[0];
     expect(argsOf(q, "eq")).toEqual(["registry_id", "honeybees"]);
     expect(argsOf(q, "order")).toEqual(["started_at", { ascending: false }]);
+    expect(argsOf(q, "neq")).toEqual(["mode", "review"]);
     expect(argsOf(q, "limit")).toEqual([1]);
     expect(argsOf(q, "gte")).toBeUndefined();
   });
@@ -118,5 +125,38 @@ describe("getNewestRunReport", () => {
     requireOwner.mockRejectedValueOnce(new Error("NEXT_REDIRECT"));
     await expect(getNewestRunReport("honeybees")).rejects.toThrow("NEXT_REDIRECT");
     expect(createClient).not.toHaveBeenCalled();
+  });
+});
+
+describe("getPullVerdicts", () => {
+  it("checks the owner before reading anything", async () => {
+    requireOwner.mockRejectedValueOnce(new Error("NEXT_REDIRECT"));
+    await expect(getPullVerdicts(NOW)).rejects.toThrow("NEXT_REDIRECT");
+    expect(createClient).not.toHaveBeenCalled();
+  });
+
+  it("reads only the review reports from the last week, newest first", async () => {
+    const fake = withRows([]);
+    expect(await getPullVerdicts(NOW)).toEqual({});
+    const q = fake.queries[0];
+    expect(argsOf(q, "eq")).toEqual(["mode", "review"]);
+    expect(argsOf(q, "gte")).toEqual(["started_at", "2026-11-17T20:00:00.000Z"]);
+    expect(argsOf(q, "order")).toEqual(["started_at", { ascending: false }]);
+  });
+
+  it("keeps the newest verdict on each PR, keyed by repo and number, with when it was given", async () => {
+    const newer = reviewReport({ pulls: [reviewReport().pulls[0]] });
+    const older = reviewReport({ startedAt: "2026-11-24T12:37:00.000Z", finishedAt: "2026-11-24T12:50:00.000Z" });
+    const barzini = reviewReport({
+      registryId: "barzini-publishing",
+      repo: "denkoregroup/Barzini-Publishing",
+      pulls: [{ ...reviewReport().pulls[0], number: 120, review: { verdict: "changes-needed", reason: "A test fails", headSha: REVIEWED_SHA } }],
+    });
+    withRows([row(newer), row(barzini), row(older)]);
+    expect(await getPullVerdicts(NOW)).toEqual({
+      "denkoregroup/honeybees#51": { verdict: "ready", headSha: REVIEWED_SHA, reviewedAt: newer.finishedAt },
+      "denkoregroup/honeybees#52": { ...older.pulls[1].review, reviewedAt: older.finishedAt },
+      "denkoregroup/barzini-publishing#120": { verdict: "changes-needed", reason: "A test fails", headSha: REVIEWED_SHA, reviewedAt: barzini.finishedAt },
+    });
   });
 });

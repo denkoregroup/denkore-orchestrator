@@ -18,7 +18,7 @@ export function CountBadge({ count }: { count: number }) {
  */
 export async function WaitingCount() {
   const count = await getHubSummary().then(
-    ({ data, reports }) => waitingCount(data, reports),
+    ({ data, reports, verdicts }) => waitingCount(data, reports, verdicts),
     () => 0,
   );
   return <CountBadge count={count} />;

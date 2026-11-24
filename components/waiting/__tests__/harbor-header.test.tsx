@@ -41,8 +41,22 @@ describe("projectStatuses", () => {
     ]);
   });
 
+  it("counts what the review wants your eyes on, and not what it sent back", () => {
+    const sha = "a".repeat(40);
+    const at = NOW;
+    const pulls = [pull({ headSha: sha }), pull({ number: 8, headSha: sha, stage: "needs_fix" }), pull({ number: 9, headSha: sha })];
+    const verdicts = {
+      "denkoregroup/barzini-publishing#7": { verdict: "changes-needed" as const, reason: "A test fails", headSha: sha, reviewedAt: at },
+      "denkoregroup/barzini-publishing#8": { verdict: "needs-david" as const, reason: "Check the copy", headSha: sha, reviewedAt: at },
+    };
+    expect(projectStatuses(data(pulls), [], verdicts)).toEqual([{ project: "barzini-publishing", needsYou: 2 }]);
+  });
+
   it("adds them up for the switch's Waiting count", () => {
     expect(waitingCount(data([pull({}), pull({ number: 8 })]), [latest()])).toBe(4);
+    const sha = "b".repeat(40);
+    const sentBack = { "denkoregroup/barzini-publishing#7": { verdict: "changes-needed" as const, reason: "A test fails", headSha: sha, reviewedAt: NOW } };
+    expect(waitingCount(data([pull({ headSha: sha })]), [], sentBack)).toBe(0);
   });
 
   it("works when GitHub isn't connected", () => {

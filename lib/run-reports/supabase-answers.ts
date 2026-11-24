@@ -19,6 +19,8 @@ export class SupabaseRunAnswerStore implements RunAnswerStore {
       .from("run_reports")
       .select("id, started_at, report")
       .eq("registry_id", registryId)
+      // The Conductor review's reports ask nothing, so answers belong to the repo runs' reports.
+      .neq("mode", "review")
       .order("started_at", { ascending: false })
       .limit(1)
       .maybeSingle();

@@ -7,8 +7,8 @@ import { WaitingCount } from "../waiting-count";
 
 describe("WaitingCount", () => {
   it("counts what waits on you across the projects", async () => {
-    const pull = { project: "honeybees", byAgent: true, stage: "ready" };
-    getHubSummary.mockResolvedValue({ data: { configured: true, pulls: [pull, { ...pull, stage: "needs_fix" }], unreadable: [], notShared: [], projectCount: 1 }, reports: [] });
+    const pull = { repo: "denkoregroup/honeybees", number: 3, project: "honeybees", byAgent: true, stage: "ready" };
+    getHubSummary.mockResolvedValue({ data: { configured: true, pulls: [pull, { ...pull, stage: "needs_fix" }], unreadable: [], notShared: [], projectCount: 1 }, reports: [], verdicts: {} });
     render(await WaitingCount());
     expect(screen.getByText("1")).toHaveTextContent("1 waiting");
   });

@@ -6,11 +6,11 @@ import { getHubSummary } from "@/lib/data/hub";
 export const metadata: Metadata = { title: "Waiting on you · Denkore" };
 
 export default async function WaitingPage() {
-  const { data, reports } = await getHubSummary();
+  const { data, reports, verdicts } = await getHubSummary();
   return (
     <section className="mx-auto max-w-2xl space-y-6">
       <RunDecisions reports={reports} />
-      <WaitingBoard data={data} />
+      <WaitingBoard data={data} verdicts={verdicts} />
       <LatestRuns reports={reports} />
     </section>
   );

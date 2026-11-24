@@ -171,6 +171,11 @@ the env vars, walk through:
     lists a `run.answered` event. In the Actions tab run "Run answers" with `honeybees`:
     the log prints the question and your answer between the "Answers from David" lines.
     Sending the same decision again says it's already answered.
+23. Review verdicts: run "Supabase migrations" so `run_reports` takes `review`. Run "Run
+    report" by hand with a report like `reviewReport()` in `test-utils/run-reports.ts`, using
+    an open agent PR's number and full head sha. `/waiting` lists it under Look closer with
+    its reason, and Latest runs and Decisions from your runs don't change. Push a commit to
+    that PR: it moves back to its GitHub section until the next review.
 
 ## Reopen a changes-requested gate at the same SHA
 

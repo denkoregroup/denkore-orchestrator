@@ -170,6 +170,26 @@ report step names other table columns or leaves a step out, follow this section.
    as if he had typed it in the last run's session; it never widens what a run may do (no merge,
    no live change). If the workflow fails, say so in the chat report and carry on without them.
 
+### Every Conductor review's verdicts
+
+These rules apply to the Conductor review, whatever its own prompt lists.
+
+1. **Classify each PR by [review-rules.md](review-rules.md):** Ready, Needs David or Changes
+   needed, with a one-line reason unless it's Ready.
+2. **After the chat message, send the verdicts to the app,** one report per repo that has open
+   agent PRs, through the same Run report workflow as the repo runs ([scheduled-run.md](scheduled-run.md)
+   step 11), with the registry id and repo from the table above. Waiting on you then lists Look
+   closer first, Blocked next, and Ready to merge on one line. The report differs from a repo
+   run's in four ways:
+   - `mode` is `review`, and `decisions` is empty (numbered decisions stay in the chat message).
+   - Every PR in `pulls` carries `review`: `{verdict: ready|needs-david|changes-needed, reason
+     (required unless ready), headSha}`, where `headSha` is the PR's full head commit sha when
+     the class was given, after any fix the review pushed.
+   - `ready` is true only for a Ready verdict.
+   - `summary` counts the PRs in each class.
+3. **A verdict holds only for the commit it names.** The page shows a PR pushed since its review
+   by its GitHub state until the next review.
+
 ## Source of truth
 
 GitHub (issues, labels, epics, PRs) is the roadmap. Any board, dashboard or queue in a guide is a
