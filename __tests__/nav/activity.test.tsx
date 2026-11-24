@@ -8,7 +8,7 @@ import { Nav, NAV_ITEMS } from "@/components/nav";
 
 describe("Activity (formerly Audit)", () => {
   it("is named Activity in the nav and links to /activity, with no Audit item left", () => {
-    expect(NAV_ITEMS.map((i) => i.label)).toEqual(["Prompt", "Runs", "Approvals", "Sites", "Activity"]);
+    expect(NAV_ITEMS.map((i) => i.label)).toEqual(["Waiting", "Prompt", "Runs", "Approvals", "Sites", "Activity"]);
     render(<Nav />);
     expect(screen.getByRole("link", { name: "Activity" })).toHaveAttribute("href", "/activity");
     expect(screen.queryByRole("link", { name: "Audit" })).toBeNull();

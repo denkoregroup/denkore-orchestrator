@@ -39,5 +39,5 @@ export async function GET(request: NextRequest) {
     return to("/login?error=not_allowed");
   }
 
-  return to("/approvals");
+  return to("/waiting");
 }

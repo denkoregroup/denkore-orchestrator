@@ -25,8 +25,10 @@ other directories.
 6. Commit with the session's attribution trailer. Push with
    `git -c push.negotiate=true push -u origin BRANCH` (on HTTP 429 wait 5s, retry once). Open the
    PR with `gh api -X POST repos/denkoregroup/REPO/pulls -f title=... -f head=BRANCH -f base=main
-   -F draft=true -F body=@body.md`. The body covers changes, assumptions, tests, what remains, what
-   was not verified, and ends with the session's PR attribution lines. "Part of #N" unless the
+   -F draft=true -F body=@body.md`. The body opens with `**Summary:** ` and one or two plain
+   sentences on what the PR does for David and how risky it is (STANDARD.md). It then covers
+   changes, assumptions, tests, what remains, what was not verified, and ends with the session's
+   PR attribution lines. "Part of #N" unless the
    issue is fully done.
 
 7. Draft only. Don't merge, don't mark ready, don't change live systems, don't create issues.
