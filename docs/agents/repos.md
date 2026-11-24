@@ -8,6 +8,7 @@ name only.
 | --- | --- | --- | --- |
 | [denkoregroup/honeybees](https://github.com/denkoregroup/honeybees) | scheduled run "HoneyBee repo run" (6:42am and 6:42pm ET; manual runs allowed) | [#76](https://github.com/denkoregroup/honeybees/issues/76) | Shopify admin, Vercel, DNS |
 | denkoregroup/barzini-publishing (private) | scheduled run "Barzini repo run" (6:43am and 6:43pm ET; manual runs allowed) | #101 | Supabase (stricter rules in the repo guide), Vercel |
+| [dclarktech302/ggrmusicgroup](https://github.com/dclarktech302/ggrmusicgroup) | scheduled run "GGR repo run" (6:44am and 6:44pm ET; manual runs allowed) | [#17](https://github.com/dclarktech302/ggrmusicgroup/issues/17) | Vercel, DNS, the Google Sheets webhook, the komi.io form |
 | denkoregroup/denkore-orchestrator | conductor | none yet | Supabase, Vercel, GitHub Actions secrets |
 
 A session that isn't the listed owner doesn't work in that repo. To change owners, update this
