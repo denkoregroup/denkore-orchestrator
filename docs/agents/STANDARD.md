@@ -159,6 +159,7 @@ report step names other table columns or leaves a step out, follow this section.
    | --- | --- | --- |
    | honeybees | `honeybees` | `denkoregroup/honeybees` |
    | barzini-publishing | `barzini-publishing` | `denkoregroup/barzini-publishing` |
+   | ggrmusicgroup | `ggrmusic-com` | `dclarktech302/ggrmusicgroup` |
 
    A repo that isn't in this table sends no report to the app; say so in the chat report.
 3. **The report holds plain text only:** no secrets, no customer or contributor data. It goes to
