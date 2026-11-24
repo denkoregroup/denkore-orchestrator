@@ -36,7 +36,7 @@ describe("/auth/callback", () => {
   it("sends the owner to /approvals, after trading the code for a session", async () => {
     const res = await call();
     expect(exchangeCodeForSession).toHaveBeenCalledWith(CODE);
-    expect(location(res).pathname).toBe("/approvals");
+    expect(location(res).pathname).toBe("/waiting");
     expect(location(res).origin).toBe("http://localhost:3000");
     expect(signOut).not.toHaveBeenCalled();
     expect(consoleError).not.toHaveBeenCalled();

@@ -4,6 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 export const NAV_ITEMS = [
+  // The control center's front page: open pull requests across every project.
+  { href: "/waiting", label: "Waiting" },
   { href: "/prompt", label: "Prompt" },
   { href: "/runs", label: "Runs" },
   { href: "/approvals", label: "Approvals" },
@@ -19,7 +21,7 @@ export function Nav() {
       aria-label="Main"
       className="fixed inset-x-0 bottom-0 z-10 border-t border-border bg-background pb-[env(safe-area-inset-bottom)] md:static md:border-t-0 md:border-r md:pb-0"
     >
-      <ul className="grid grid-cols-5 md:flex md:flex-col md:gap-1 md:p-3">
+      <ul className="grid grid-cols-6 md:flex md:flex-col md:gap-1 md:p-3">
         {NAV_ITEMS.map((item) => {
           const { href, label } = item;
           const paths = [href, ...("also" in item ? item.also : [])];

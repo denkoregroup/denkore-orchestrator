@@ -57,6 +57,7 @@ The first GitHub sign-in links to the seeded owner by email, so the GitHub accou
 **Vercel** (Production and Preview)
 
 - [ ] The five variables listed above. `SUPABASE_SECRET_KEY` is server only; never expose it to the browser.
+- [ ] `GITHUB_READ_TOKEN` for `/waiting`: a fine-grained token on the denkoregroup repos with read-only Pull requests, Checks and Metadata. Server only.
 
 ## Commands
 
@@ -79,13 +80,14 @@ CI runs typecheck, lint and tests on every pull request.
 
 | Path | What it is |
 | --- | --- |
-| `app/` | Pages (`/prompt`, `/runs`, `/approvals`, `/sites`, `/prospects` (type a site, get a check in about 15 seconds), `/activity`, `/login`, and `/check/[reportId]`, the site check for a phone and its one-page PDF) and the API routes. `/activity` is the event log; `/audit` redirects there |
+| `app/` | Pages (`/waiting` (open pull requests across every registered project; where sign-in lands), `/prompt`, `/runs`, `/approvals`, `/sites`, `/prospects` (type a site, get a check in about 15 seconds), `/activity`, `/login`, and `/check/[reportId]`, the site check for a phone and its one-page PDF) and the API routes. `/activity` is the event log; `/audit` redirects there |
 | `proxy.ts` | Refreshes the session and keeps everyone but the owner out |
 | `lib/conductor/` | Decides and applies each run's next step; its limits are in `limits.ts` |
 | `lib/state-machine/` | Run states and allowed moves |
 | `lib/audits/` | The site auditor (CLI: `scripts/audit-run.ts`) |
 | `lib/site-check/` | The prospect site check: four lights, a headline and the top three fixes from one report (all wording, and the booking link, in `copy.ts`) |
 | `components/site-check/` | The site check view and its QR code |
+| `lib/github/` | Reads open pull requests and their check runs from GitHub (`/waiting`) |
 | `lib/site-health/` | Stored audit reports, what changed between two of them, and the missed-run watchdog the tick runs |
 | `supabase/` | Migrations (schema, RLS, triggers), the local seed and the local stack config |
 | `registry/` | One YAML file per project |
