@@ -1,0 +1,40 @@
+# Barzini Family Music Publishing: Next.js 16 + Supabase dashboard. Private repo.
+# Confirmed from the repo on Nov 24, 2026. Built by the "Barzini repo run" Duet
+# session (docs/agents/repos.md). Production is its only environment, so every
+# merge to main deploys there: infra tier.
+id: barzini-publishing
+repo: denkoregroup/barzini-publishing
+gateTier: infra
+hosting:
+  provider: vercel
+stack:
+  - nextjs
+  - supabase
+design:
+  system: barzini
+integrations:
+  - name: supabase
+    envVars:
+      - NEXT_PUBLIC_SUPABASE_URL
+      - NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+      - SUPABASE_SECRET_KEY
+  - name: resend
+    envVars:
+      - RESEND_API_KEY
+      - RESEND_FROM_EMAIL
+phase: build
+tracker:
+  provider: github
+  project: denkoregroup/barzini-publishing
+backlog: docs/AGENT_GUIDE.md
+constraints:
+  - Ask David before every Supabase request, even a read.
+  - Schema changes only as new files in supabase/migrations/, deployed by the workflow.
+  - Contributors' branches are off limits.
+gates:
+  oneTap:
+    - spec
+    - design
+  prReview:
+    - release
+criticalFlowsPath: __tests__

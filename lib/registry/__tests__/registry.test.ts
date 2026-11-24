@@ -85,19 +85,28 @@ describe("registry audits block", () => {
   });
 });
 
-describe("the v1 registry (registry/*.yaml)", () => {
-  it("is exactly denkore.com, ggrmusic.com and dclarkdev.com, each with an audits block", async () => {
-    const registry = await loadRegistry();
-    expect([...registry.keys()].sort()).toEqual(["dclarkdev-com", "denkore-com", "ggrmusic-com"]);
-    expect([...registry.values()].map((e) => new URL(e.audits!.url).host).sort()).toEqual([
+describe("the registry (registry/*.yaml)", () => {
+  it("audits exactly denkore.com, ggrmusic.com and dclarkdev.com", async () => {
+    const audited = [...(await loadRegistry()).values()].filter((e) => e.audits);
+    expect(audited.map((e) => e.id).sort()).toEqual(["dclarkdev-com", "denkore-com", "ggrmusic-com"]);
+    expect(audited.map((e) => new URL(e.audits!.url).host).sort()).toEqual([
       "dclarkdev.com",
       "www.denkore.com",
       "www.ggrmusic.com",
     ]);
   });
 
-  it("does not include denkoregroup.com, which is not a Denkore build", async () => {
+  it("lists the projects agent sessions build, without an audits block until they launch", async () => {
     const registry = await loadRegistry();
-    for (const entry of registry.values()) expect(new URL(entry.audits!.url).host).not.toMatch(/denkoregroup/);
+    for (const id of ["honeybees", "barzini-publishing", "denkore-orchestrator"]) {
+      expect(registry.get(id)).toMatchObject({ repo: `denkoregroup/${id}` });
+      expect(registry.get(id)?.audits).toBeUndefined();
+    }
+  });
+
+  it("does not audit denkoregroup.com, which is not a Denkore build", async () => {
+    for (const entry of (await loadRegistry()).values()) {
+      if (entry.audits) expect(new URL(entry.audits.url).host).not.toMatch(/denkoregroup/);
+    }
   });
 });
