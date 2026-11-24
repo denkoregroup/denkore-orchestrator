@@ -1,0 +1,42 @@
+name: Run report
+
+# Sends one scheduled Duet run's report (its PRs, notes and numbered decisions) to the
+# app, so it shows on the Waiting on you page. The run starts this workflow with its
+# report as the input; this job signs it with STEP_WEBHOOK_SECRET, which the runs never
+# see. See docs/agents/scheduled-run.md. Anyone who can push to this repository can
+# start it, the same people who can change the app itself.
+#
+# Needs: the repository variable CONDUCTOR_TICK_URL (or RUN_REPORT_URL) and the secret
+# STEP_WEBHOOK_SECRET, both already set for the Conductor tick.
+
+on:
+  workflow_dispatch:
+    inputs:
+      report:
+        description: "The run report, as one JSON object (lib/run-reports/schema.ts)"
+        required: true
+        type: string
+
+# Nothing by default. The one job below gets only what checkout needs.
+permissions: {}
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      # The repository is private: checkout needs read access, nothing more.
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # The report reaches the script only through the environment, never pasted into
+      # the shell command, so nothing in it can run as a command.
+      - name: Send the signed report
+        run: node scripts/post-run-report.mjs
+        env:
+          REPORT_JSON: ${{ inputs.report }}
+          RUN_REPORT_URL: ${{ vars.RUN_REPORT_URL }}
+          CONDUCTOR_TICK_URL: ${{ vars.CONDUCTOR_TICK_URL }}
+          STEP_WEBHOOK_SECRET: ${{ secrets.STEP_WEBHOOK_SECRET }}

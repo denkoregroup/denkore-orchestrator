@@ -73,7 +73,7 @@ export function WaitingBoard({ data }: { data: WaitingData }) {
       ))}
       {agentPulls.length === 0 && (
         <p className="rounded-lg border border-border p-4 text-muted">
-          Nothing is waiting on you across your {data.projectCount} projects.
+          No pull request is waiting on you across your {data.projectCount} projects.
         </p>
       )}
       {SECTIONS.map(({ stage, title, hint }) => {
