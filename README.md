@@ -57,8 +57,8 @@ The runner is a stub until #32, so nothing is built or deployed; you post each s
 
 **GitHub Actions** (Settings > Secrets and variables > Actions), for the 5-minute Conductor tick, the daily site audit and the migration deploy
 
-- [ ] Secret `STEP_WEBHOOK_SECRET`: the same value the app uses (the tick and the daily audit both sign with it).
-- [ ] Variable `CONDUCTOR_TICK_URL`: `https://<production-domain>/api/conductor/tick`.
+- [ ] Secret `STEP_WEBHOOK_SECRET`: the same value the app uses (the tick, the daily audit and the Run report workflow all sign with it).
+- [ ] Variable `CONDUCTOR_TICK_URL`: `https://<production-domain>/api/conductor/tick`. The Run report workflow sends to `/api/conductor/run-report` on the same app (set `RUN_REPORT_URL` only to send elsewhere).
 - [ ] Variable `AUDIT_REPORT_URL`: `https://<production-domain>/api/audits/report`.
 
 **Deploying a migration.** Add a file to `supabase/migrations/` (`pnpm exec supabase migration new <name>`), merge it, then run **Supabase migrations** from the Actions tab. It lists what is pending, then applies it. Nothing deploys on merge. Needs the secrets `SUPABASE_ACCESS_TOKEN` and `SUPABASE_DB_PASSWORD` and the variable `SUPABASE_PROJECT_REF`. Never edit a migration that has been applied; add a new one.
@@ -89,7 +89,7 @@ CI runs typecheck, lint and tests on every pull request.
 
 | Path | What it is |
 | --- | --- |
-| `app/` | Pages (`/waiting` (open pull requests across every registered project; where sign-in lands), `/prompt`, `/runs`, `/approvals`, `/sites`, `/prospects` (type a site, get a check in about 15 seconds), `/activity`, `/login`, and `/check/[reportId]`, the site check for a phone and its one-page PDF) and the API routes. `/activity` is the event log; `/audit` redirects there |
+| `app/` | Pages (`/waiting` (open pull requests across every registered project, plus the decisions and summaries the scheduled runs reported; where sign-in lands), `/prompt`, `/runs`, `/approvals`, `/sites`, `/prospects` (type a site, get a check in about 15 seconds), `/activity`, `/login`, and `/check/[reportId]`, the site check for a phone and its one-page PDF) and the API routes. `/activity` is the event log; `/audit` redirects there |
 | `proxy.ts` | Refreshes the session and keeps everyone but the owner out |
 | `lib/conductor/` | Decides and applies each run's next step; its limits are in `limits.ts` |
 | `lib/state-machine/` | Run states and allowed moves |
@@ -97,11 +97,12 @@ CI runs typecheck, lint and tests on every pull request.
 | `lib/site-check/` | The prospect site check: four lights, a headline and the top three fixes from one report (all wording, and the booking link, in `copy.ts`) |
 | `components/site-check/` | The site check view and its QR code |
 | `lib/github/` | Reads open pull requests and their check runs from GitHub (`/waiting`) |
+| `lib/run-reports/` | What a scheduled Duet run reports when it finishes (PRs, notes, numbered decisions): the schema and the signed route that stores it. Runs send it through the **Run report** workflow, which signs it, so they never hold the secret |
 | `lib/audit-fixes/` | Fix with Conductor on a site report: what can be fixed in code (`lib/audits/checks/catalog.ts`), the run's prompt, and the buttons |
 | `lib/site-health/` | Stored audit reports, what changed between two of them, and the missed-run watchdog the tick runs |
 | `supabase/` | Migrations (schema, RLS, triggers), the local seed and the local stack config |
 | `registry/` | One YAML file per project |
-| `.github/workflows/` | CI, the Conductor tick, the daily site audit and the manual migration deploy |
+| `.github/workflows/` | CI, the Conductor tick, the daily site audit, the manual migration deploy and the Run report relay |
 
 Follow-ups are in `docs/backlog.md`; the audit slices are tracked in
 [#15](https://github.com/denkoregroup/denkore-orchestrator/issues/15).

@@ -161,6 +161,11 @@ the env vars, walk through:
     "Supabase migrations" by hand: the dry-run step lists nothing pending, and the push
     says the database is up to date. Then add a trivial migration and run it again to see
     it listed and applied.
+21. Run reports: run "Supabase migrations" so `run_reports` exists. In the Actions tab run
+    "Run report" by hand with a report like the one in `test-utils/run-reports.ts`. It goes
+    green and `/waiting` shows the run under Latest runs and its questions under Decisions
+    from your runs. Run it again with the same input: it stays green and nothing doubles.
+    Change `repo` to another owner: the run goes red with the app's reason.
 
 ## Reopen a changes-requested gate at the same SHA
 

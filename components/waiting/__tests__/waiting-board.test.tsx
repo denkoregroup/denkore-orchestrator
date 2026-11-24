@@ -28,7 +28,7 @@ describe("WaitingBoard", () => {
 
   it("says nothing is waiting when no agent PR is open", () => {
     render(<WaitingBoard data={{ configured: true, pulls: [], unreadable: [], notShared: [], projectCount: 6 }} />);
-    expect(screen.getByText("Nothing is waiting on you across your 6 projects.")).toBeVisible();
+    expect(screen.getByText("No pull request is waiting on you across your 6 projects.")).toBeVisible();
   });
 
   it("groups agent PRs by what they wait on and links each to GitHub with its number and title", () => {
@@ -98,7 +98,7 @@ describe("WaitingBoard", () => {
     );
     expect(screen.queryByRole("alert")).toBeNull();
     expect(screen.getByText(/Not shown, because the GitHub token doesn.t include their repos: dclarkdev-com, ggrmusic-com\./)).toBeVisible();
-    expect(screen.getByText("Nothing is waiting on you across your 3 projects.")).toBeVisible();
+    expect(screen.getByText("No pull request is waiting on you across your 3 projects.")).toBeVisible();
   });
 
   it("shows each PR's summary under its title, and says so when an agent PR has none", () => {

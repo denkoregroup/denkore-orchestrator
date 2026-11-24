@@ -36,7 +36,9 @@ says who owns it: a dedicated session or the conductor's scheduled run.
    with a test that reproduces the bug first.
 5. **Lead reviews** with `gh api repos/O/R/pulls/N/files`, the check runs and the commit statuses,
    and says plainly what wasn't verified (previews not opened, no real email sent).
-6. **Report to David:** a table of PRs, three notes or fewer, numbered decisions.
+6. **Report to David:** a table of PRs, three notes or fewer, numbered decisions. Scheduled
+   runs also send that report to the app through the Run report workflow
+   (`docs/agents/scheduled-run.md`, step 10), so it shows on the Waiting on you page.
 7. **On a yes, merge in dependency order,** pinned to the reviewed sha. Then rebase the dependent
    PRs, fix what the rebase broke, re-run CI and re-report.
 
