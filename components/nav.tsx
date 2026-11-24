@@ -31,11 +31,13 @@ export function Nav() {
               <Link
                 href={href}
                 aria-current={active ? "page" : undefined}
-                className={`flex min-h-12 items-center justify-center text-sm md:justify-start md:rounded-md md:px-3 ${
-                  active ? "font-semibold text-accent" : "text-muted hover:text-foreground"
+                className={`flex min-h-12 flex-col items-center justify-center gap-1 text-sm md:flex-row md:justify-start md:gap-2 md:rounded-md md:px-3 ${
+                  active ? "font-semibold text-foreground" : "text-muted hover:text-foreground"
                 }`}
               >
                 {label}
+                {/* Brass marks navigation: a small dot under the active item (beside it on wide screens). */}
+                <span aria-hidden="true" className={`size-1 rounded-full md:order-first ${active ? "bg-accent" : "bg-transparent"}`} />
               </Link>
             </li>
           );

@@ -21,7 +21,7 @@ function SessionLink({ report }: { report: RunReport }) {
 function DecisionCard({ latest }: { latest: LatestRunReport }) {
   const { report } = latest;
   return (
-    <li className="space-y-2 rounded-lg border border-border p-4">
+    <li className="surface-card space-y-2 p-4">
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 text-sm text-muted">
         <span className="font-medium text-foreground">{report.registryId}</span>
         <span>
@@ -56,7 +56,7 @@ function DecisionCard({ latest }: { latest: LatestRunReport }) {
 
 function RunCard({ report }: { report: RunReport }) {
   return (
-    <li className="space-y-2 rounded-lg border border-border p-4">
+    <li className="surface-card space-y-2 p-4">
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 text-sm text-muted">
         <span className="font-medium text-foreground">{report.registryId}</span>
         <span>
