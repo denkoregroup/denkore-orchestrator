@@ -1,0 +1,37 @@
+# HoneyBee Designs: headless Shopify storefront on Next.js 16 for client Sarah Tabb.
+# Confirmed from the repo and the Vercel project on Nov 24, 2026. Built by the
+# "HoneyBee repo run" Duet session (docs/agents/repos.md). No audits block yet:
+# the store isn't launched (target about Dec 8, 2026).
+id: honeybees
+repo: denkoregroup/honeybees
+gateTier: app
+hosting:
+  provider: vercel
+  project: honeybees
+stack:
+  - nextjs
+  - shopify
+design:
+  system: honeybees
+integrations:
+  - name: shopify-storefront
+    envVars:
+      - SHOPIFY_STORE_DOMAIN
+      - SHOPIFY_STOREFRONT_ACCESS_TOKEN
+      - SHOPIFY_STOREFRONT_TOKEN_TYPE
+      - SHOPIFY_STOREFRONT_API_VERSION
+phase: build
+tracker:
+  provider: github
+  project: denkoregroup/honeybees
+backlog: docs/AGENT_GUIDE.md
+constraints:
+  - Ask David before any change in Shopify admin, Vercel or DNS.
+  - No invented claims (shipping promises, reviews, hours, policies).
+gates:
+  oneTap:
+    - spec
+    - design
+  prReview:
+    - release
+criticalFlowsPath: test

@@ -1,0 +1,34 @@
+# This app: Denkore's control center. Confirmed Nov 24, 2026. Worked on by the
+# conductor session (docs/agents/repos.md). Infra tier: it holds the approval
+# gates and the webhook secret.
+id: denkore-orchestrator
+repo: denkoregroup/denkore-orchestrator
+gateTier: infra
+hosting:
+  provider: vercel
+  project: denkore-orchestrator
+stack:
+  - nextjs
+  - supabase
+design:
+  system: denkore-base
+integrations:
+  - name: supabase
+    envVars:
+      - NEXT_PUBLIC_SUPABASE_URL
+      - NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+      - SUPABASE_SECRET_KEY
+phase: build
+tracker:
+  provider: github
+  project: denkoregroup/denkore-orchestrator
+backlog: docs/backlog.md
+constraints:
+  - Ask David before any change to Supabase, Vercel or GitHub Actions secrets.
+gates:
+  oneTap:
+    - spec
+    - design
+  prReview:
+    - release
+criticalFlowsPath: __tests__
