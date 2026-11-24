@@ -36,6 +36,8 @@ export interface RepoPulls {
   pulls: PullSummary[];
   /** Set when the repo couldn't be read; its pulls are then empty. */
   error: string | null;
+  /** True when GitHub answered 404: the token wasn't given this repo, which is a choice, not a fault. */
+  notShared: boolean;
 }
 
 type FetchFn = (url: string, init: RequestInit) => Promise<Response>;
@@ -61,7 +63,14 @@ export function stageOf(checks: ChecksState, conflicts: boolean | null): PullSta
   return "ready";
 }
 
-class GitHubError extends Error {}
+class GitHubError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message);
+  }
+}
 
 async function getJson(fetchFn: FetchFn, token: string, path: string): Promise<unknown> {
   const res = await fetchFn(`${GITHUB_API}${path}`, {
@@ -79,6 +88,7 @@ async function getJson(fetchFn: FetchFn, token: string, path: string): Promise<u
       res.status === 404 || res.status === 403
         ? `GitHub answered ${res.status}: the token can't see this repository`
         : `GitHub answered ${res.status}`,
+      res.status,
     );
   }
   return res.json();
@@ -125,11 +135,11 @@ export async function listRepoPulls(fetchFn: FetchFn, token: string, repo: strin
   try {
     const listed = (await getJson(fetchFn, token, `/repos/${repo}/pulls?state=open&per_page=50`)) as ListedPull[];
     const pulls = await Promise.all(listed.map((p) => summarizePull(fetchFn, token, repo, p)));
-    return { repo, pulls, error: null };
+    return { repo, pulls, error: null, notShared: false };
   } catch (e) {
     const reason =
       e instanceof GitHubError ? e.message : e instanceof Error && e.name === "TimeoutError" ? "GitHub didn't answer in time" : "Couldn't reach GitHub";
-    return { repo, pulls: [], error: reason };
+    return { repo, pulls: [], error: reason, notShared: e instanceof GitHubError && e.status === 404 };
   }
 }
 

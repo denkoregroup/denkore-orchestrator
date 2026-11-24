@@ -89,7 +89,13 @@ describe("listRepoPulls", () => {
       repo: "o/private",
       pulls: [],
       error: "GitHub answered 404: the token can't see this repository",
+      notShared: true,
     });
+  });
+
+  it("treats any other refusal as an error, not as a repo left out", async () => {
+    const { fn } = fakeFetch({ "/repos/o/r/pulls?state=open&per_page=50": { status: 403, body: {} } });
+    expect(await listRepoPulls(fn, "tok", "o/r")).toMatchObject({ error: "GitHub answered 403: the token can't see this repository", notShared: false });
   });
 
   it("reports a network failure without leaking its details", async () => {

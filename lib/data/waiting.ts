@@ -15,6 +15,9 @@ export type WaitingData =
       pulls: WaitingPull[];
       /** Repos that couldn't be read, with the reason. */
       unreadable: Array<{ project: string; repo: string; error: string }>;
+      /** Projects whose repo the token wasn't given. Left out on purpose, so not an error. */
+      notShared: Array<{ project: string; repo: string }>;
+      /** Projects whose repos were read or tried, not counting notShared. */
       projectCount: number;
     };
 
@@ -32,7 +35,8 @@ export async function getWaiting(): Promise<WaitingData> {
     .flatMap((r) => r.pulls.map((p) => ({ ...p, project: projectOf.get(r.repo) ?? r.repo })))
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   const unreadable = results.flatMap((r) =>
-    r.error ? [{ project: projectOf.get(r.repo) ?? r.repo, repo: r.repo, error: r.error }] : [],
+    r.error && !r.notShared ? [{ project: projectOf.get(r.repo) ?? r.repo, repo: r.repo, error: r.error }] : [],
   );
-  return { configured: true, pulls, unreadable, projectCount: projectOf.size };
+  const notShared = results.flatMap((r) => (r.notShared ? [{ project: projectOf.get(r.repo) ?? r.repo, repo: r.repo }] : []));
+  return { configured: true, pulls, unreadable, notShared, projectCount: projectOf.size - notShared.length };
 }
