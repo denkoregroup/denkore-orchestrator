@@ -39,8 +39,8 @@ describe("getWaiting", () => {
   it("reads every registered repo, names each PR's project, newest first, and keeps unreadable repos", async () => {
     process.env.GITHUB_READ_TOKEN = "tok";
     listOpenPulls.mockResolvedValueOnce([
-      { repo: "denkoregroup/honeybees", error: null, pulls: [{ number: 1, updatedAt: "2026-11-24T10:00:00Z" }, { number: 2, updatedAt: "2026-11-24T12:00:00Z" }] },
-      { repo: "denkoregroup/barzini-publishing", error: "GitHub answered 404: the token can't see this repository", pulls: [] },
+      { repo: "denkoregroup/honeybees", error: null, notShared: false, pulls: [{ number: 1, updatedAt: "2026-11-24T10:00:00Z" }, { number: 2, updatedAt: "2026-11-24T12:00:00Z" }] },
+      { repo: "denkoregroup/barzini-publishing", error: "GitHub didn't answer in time", notShared: false, pulls: [] },
     ]);
     const data = await getWaiting();
     expect(listOpenPulls).toHaveBeenCalledWith(expect.any(Function), "tok", ["denkoregroup/honeybees", "denkoregroup/barzini-publishing"]);
@@ -48,7 +48,23 @@ describe("getWaiting", () => {
       configured: true,
       projectCount: 2,
       pulls: [expect.objectContaining({ number: 2, project: "honeybees" }), expect.objectContaining({ number: 1, project: "honeybees" })],
-      unreadable: [{ project: "barzini-publishing", repo: "denkoregroup/barzini-publishing", error: "GitHub answered 404: the token can't see this repository" }],
+      unreadable: [{ project: "barzini-publishing", repo: "denkoregroup/barzini-publishing", error: "GitHub didn't answer in time" }],
+      notShared: [],
+    });
+  });
+
+  it("lists a repo the token wasn't given apart from errors, and leaves it out of the count", async () => {
+    process.env.GITHUB_READ_TOKEN = "tok";
+    listOpenPulls.mockResolvedValueOnce([
+      { repo: "denkoregroup/honeybees", error: null, notShared: false, pulls: [] },
+      { repo: "denkoregroup/barzini-publishing", error: "GitHub answered 404: the token can't see this repository", notShared: true, pulls: [] },
+    ]);
+    expect(await getWaiting()).toEqual({
+      configured: true,
+      projectCount: 1,
+      pulls: [],
+      unreadable: [],
+      notShared: [{ project: "barzini-publishing", repo: "denkoregroup/barzini-publishing" }],
     });
   });
 });

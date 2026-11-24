@@ -26,7 +26,7 @@ describe("WaitingBoard", () => {
   });
 
   it("says nothing is waiting when no agent PR is open", () => {
-    render(<WaitingBoard data={{ configured: true, pulls: [], unreadable: [], projectCount: 6 }} />);
+    render(<WaitingBoard data={{ configured: true, pulls: [], unreadable: [], notShared: [], projectCount: 6 }} />);
     expect(screen.getByText("No pull request is waiting on you across your 6 projects.")).toBeVisible();
   });
 
@@ -36,7 +36,7 @@ describe("WaitingBoard", () => {
       { ...base, project: "barzini-publishing", repo: "denkoregroup/barzini-publishing", number: 120, checks: "failing", stage: "needs_fix", url: "https://github.com/denkoregroup/barzini-publishing/pull/120" },
       { ...base, number: 62, title: "Hero photos", checks: "running", stage: "checks_running", url: "https://github.com/denkoregroup/honeybees/pull/62" },
     ];
-    render(<WaitingBoard data={{ configured: true, pulls, unreadable: [], projectCount: 6 }} />);
+    render(<WaitingBoard data={{ configured: true, pulls, unreadable: [], notShared: [], projectCount: 6 }} />);
 
     const ready = screen.getByRole("region", { name: "Ready for your yes (1)" });
     const link = within(ready).getByRole("link", { name: "#61 Agent guide for this repo" });
@@ -57,7 +57,7 @@ describe("WaitingBoard", () => {
       { ...base, conflicts: true, stage: "needs_fix" },
       { ...base, number: 99, title: "Contributor work", byAgent: false, author: "ant", draft: false },
     ];
-    render(<WaitingBoard data={{ configured: true, pulls, unreadable: [], projectCount: 6 }} />);
+    render(<WaitingBoard data={{ configured: true, pulls, unreadable: [], notShared: [], projectCount: 6 }} />);
     expect(within(screen.getByRole("region", { name: "Needs a fix first (1)" })).getByText("Conflicts with main")).toBeVisible();
     const others = screen.getByRole("region", { name: "Other people's pull requests (1)" });
     expect(within(others).getByText("By ant")).toBeVisible();
@@ -70,12 +70,33 @@ describe("WaitingBoard", () => {
         data={{
           configured: true,
           pulls: [base],
-          unreadable: [{ project: "barzini-publishing", repo: "denkoregroup/barzini-publishing", error: "GitHub answered 404: the token can't see this repository" }],
+          unreadable: [{ project: "barzini-publishing", repo: "denkoregroup/barzini-publishing", error: "GitHub didn't answer in time" }],
+          notShared: [],
           projectCount: 6,
         }}
       />,
     );
     expect(screen.getByRole("alert")).toHaveTextContent("Couldn't read barzini-publishing (denkoregroup/barzini-publishing)");
     expect(screen.getByRole("link", { name: "#61 Agent guide for this repo" })).toBeVisible();
+  });
+
+  it("names the projects the token leaves out quietly, not as an alert", () => {
+    render(
+      <WaitingBoard
+        data={{
+          configured: true,
+          pulls: [],
+          unreadable: [],
+          notShared: [
+            { project: "dclarkdev-com", repo: "denkoregroup/dclarkdev" },
+            { project: "ggrmusic-com", repo: "dclarktech302/ggrmusicgroup" },
+          ],
+          projectCount: 3,
+        }}
+      />,
+    );
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.getByText(/Not shown, because the GitHub token doesn.t include their repos: dclarkdev-com, ggrmusic-com\./)).toBeVisible();
+    expect(screen.getByText("No pull request is waiting on you across your 3 projects.")).toBeVisible();
   });
 });

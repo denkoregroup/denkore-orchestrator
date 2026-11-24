@@ -71,6 +71,12 @@ export function WaitingBoard({ data }: { data: WaitingData }) {
           Couldn&apos;t read {u.project} ({u.repo}): {u.error}.
         </p>
       ))}
+      {data.notShared.length > 0 && (
+        <p className="text-sm text-muted">
+          Not shown, because the GitHub token doesn&apos;t include their repos:{" "}
+          {data.notShared.map((n) => n.project).join(", ")}.
+        </p>
+      )}
       {agentPulls.length === 0 && (
         <p className="rounded-lg border border-border p-4 text-muted">
           No pull request is waiting on you across your {data.projectCount} projects.
