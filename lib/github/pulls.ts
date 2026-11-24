@@ -29,6 +29,8 @@ export interface PullSummary {
   /** null while GitHub is still working it out. */
   conflicts: boolean | null;
   stage: PullStage;
+  /** The "Summary:" line from the PR body, or null when it has none. */
+  summary: string | null;
 }
 
 export interface RepoPulls {
@@ -44,6 +46,25 @@ type FetchFn = (url: string, init: RequestInit) => Promise<Response>;
 
 const FAILED = new Set(["failure", "timed_out", "cancelled", "action_required", "startup_failure"]);
 const AGENT_MARK = "Generated with [Claude Code]";
+const SUMMARY_MAX = 300;
+
+/**
+ * The PR's plain-English summary: the text after "Summary:" (bold or not) on
+ * the first line of the body that starts with it (docs/agents/STANDARD.md).
+ * Links keep their words, other markdown marks are dropped, and it's cut at
+ * 300 characters. Null when the body has no summary line.
+ */
+export function summaryOf(body: string | null): string | null {
+  const match = (body ?? "").match(/^\s*(?:\*\*Summary:\*\*|\*\*Summary\*\*:|Summary:)[ \t]*(.+)$/im);
+  if (!match) return null;
+  const text = match[1]
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
+    .replace(/[*_`]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!text) return null;
+  return text.length > SUMMARY_MAX ? `${text.slice(0, SUMMARY_MAX - 1).trimEnd()}…` : text;
+}
 
 interface CheckRun {
   status: string;
@@ -127,6 +148,7 @@ async function summarizePull(fetchFn: FetchFn, token: string, repo: string, pull
     checks,
     conflicts,
     stage: stageOf(checks, conflicts),
+    summary: summaryOf(pull.body),
   };
 }
 

@@ -36,6 +36,11 @@ function PullCard({ pull }: { pull: WaitingPull }) {
       >
         #{pull.number} {pull.title}
       </a>
+      {pull.summary ? (
+        <p className="break-words">{pull.summary}</p>
+      ) : (
+        pull.byAgent && <p className="text-sm text-muted">No summary in this pull request yet.</p>
+      )}
       <ul className="flex flex-wrap gap-2 text-xs" aria-label="Status">
         <li className={`rounded border px-1.5 py-0.5 ${pull.checks === "failing" ? "border-accent font-semibold text-accent" : "border-border"}`}>
           {CHECKS_LABEL[pull.checks]}
