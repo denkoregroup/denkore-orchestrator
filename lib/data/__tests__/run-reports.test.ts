@@ -9,17 +9,19 @@ const createClient = jest.fn();
 jest.mock("@/lib/auth", () => ({ requireOwner: () => requireOwner() }));
 jest.mock("@/lib/supabase/server", () => ({ createClient: () => createClient() }));
 
-import { getLatestRunReports } from "../run-reports";
+import { getLatestRunReports, getNewestRunReport } from "../run-reports";
 
 const NOW = new Date("2026-11-24T20:00:00Z");
 
-function withRows(rows: unknown) {
-  const fake = createFakeSupabase(() => ({ data: rows, error: null }));
+function withRows(rows: unknown, answers: unknown = []) {
+  const fake = createFakeSupabase((q) => ({ data: q.table === "events" ? answers : rows, error: null }));
   createClient.mockResolvedValue(fake.client);
   return fake;
 }
 
-const row = (report: ReturnType<typeof runReport>) => ({ registry_id: report.registryId, received_at: report.finishedAt, report });
+const ID_HONEY = "0b6f2f8e-3c1a-4d5e-9f7a-1b2c3d4e5f60";
+const ID_OTHER = "1c7a3e9f-4d2b-4e6f-8a1b-2c3d4e5f6a70";
+const row = (report: ReturnType<typeof runReport>, id = ID_OTHER) => ({ id, registry_id: report.registryId, received_at: report.finishedAt, report });
 
 afterEach(() => jest.clearAllMocks());
 
@@ -49,7 +51,7 @@ describe("getLatestRunReports", () => {
       finishedAt: "2026-11-24T12:05:00.000Z",
       decisions: [],
     });
-    withRows([row(barziniQuiet), row(honeyNew), row(honeyOld)]);
+    withRows([row(barziniQuiet), row(honeyNew, ID_HONEY), row(honeyOld)]);
     const latest = await getLatestRunReports(NOW);
     expect(latest.map((l) => [l.report.registryId, l.report.startedAt])).toEqual([
       ["honeybees", honeyNew.startedAt],
@@ -57,8 +59,34 @@ describe("getLatestRunReports", () => {
     ]);
   });
 
+  it("attaches your answers to the newest reports that asked something, by decision number", async () => {
+    const asked = runReport();
+    const quiet = runReport({ registryId: "barzini-publishing", repo: "denkoregroup/barzini-publishing", decisions: [] });
+    const fake = withRows(
+      [row(asked, ID_HONEY), row(quiet, ID_OTHER)],
+      [
+        {
+          payload: { run_report_id: ID_HONEY, registry_id: "honeybees", decision_number: 2, question: "Take the product reviews item next?", answer: "Yes" },
+          created_at: "2026-11-24T16:00:00Z",
+        },
+      ],
+    );
+    const latest = await getLatestRunReports(NOW);
+    expect(latest[0]).toMatchObject({ id: ID_HONEY, answers: { 2: { answer: "Yes", answeredAt: "2026-11-24T16:00:00Z" } } });
+    expect(latest[1].answers).toEqual({});
+    const events = fake.queries.find((q) => q.table === "events")!;
+    expect(argsOf(events, "eq")).toEqual(["kind", "run.answered"]);
+    expect(argsOf(events, "in")).toEqual(["payload->>run_report_id", [ID_HONEY]]);
+  });
+
+  it("doesn't look for answers when no report asked anything", async () => {
+    const fake = withRows([row(runReport({ decisions: [] }), ID_HONEY)]);
+    await getLatestRunReports(NOW);
+    expect(fake.queries.map((q) => q.table)).toEqual(["run_reports"]);
+  });
+
   it("fails loudly when a stored report doesn't match the schema", async () => {
-    withRows([{ registry_id: "honeybees", received_at: "x", report: { schemaVersion: 9 } }]);
+    withRows([{ id: ID_HONEY, registry_id: "honeybees", received_at: "x", report: { schemaVersion: 9 } }]);
     await expect(getLatestRunReports(NOW)).rejects.toThrow(/run_reports/);
   });
 
@@ -66,5 +94,29 @@ describe("getLatestRunReports", () => {
     const fake = createFakeSupabase(() => ({ data: null, error: { message: "permission denied" } }));
     createClient.mockResolvedValue(fake.client);
     await expect(getLatestRunReports(NOW)).rejects.toThrow(/permission denied/);
+  });
+});
+
+describe("getNewestRunReport", () => {
+  it("checks the owner, then reads the project's newest report of any age", async () => {
+    const report = runReport();
+    const fake = withRows([row(report, ID_HONEY)]);
+    expect(await getNewestRunReport("honeybees")).toEqual({ id: ID_HONEY, report });
+    const q = fake.queries[0];
+    expect(argsOf(q, "eq")).toEqual(["registry_id", "honeybees"]);
+    expect(argsOf(q, "order")).toEqual(["started_at", { ascending: false }]);
+    expect(argsOf(q, "limit")).toEqual([1]);
+    expect(argsOf(q, "gte")).toBeUndefined();
+  });
+
+  it("is null when the project has no report", async () => {
+    withRows([]);
+    expect(await getNewestRunReport("honeybees")).toBeNull();
+  });
+
+  it("stops at the owner check", async () => {
+    requireOwner.mockRejectedValueOnce(new Error("NEXT_REDIRECT"));
+    await expect(getNewestRunReport("honeybees")).rejects.toThrow("NEXT_REDIRECT");
+    expect(createClient).not.toHaveBeenCalled();
   });
 });

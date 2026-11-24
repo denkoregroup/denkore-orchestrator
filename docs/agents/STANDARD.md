@@ -38,7 +38,8 @@ says who owns it: a dedicated session or the conductor's scheduled run.
    and says plainly what wasn't verified (previews not opened, no real email sent).
 6. **Report to David:** a table of PRs, three notes or fewer, numbered decisions. Scheduled
    runs also send that report to the app through the Run report workflow
-   (`docs/agents/scheduled-run.md`, step 10), so it shows on the Waiting on you page.
+   (`docs/agents/scheduled-run.md`, step 11), so it shows on the Waiting on you page. David can
+   answer the numbered decisions there; the next run fetches those answers first (step 5).
 7. **On a yes, merge in dependency order,** pinned to the reviewed sha. Then rebase the dependent
    PRs, fix what the rebase broke, re-run CI and re-report.
 
@@ -140,7 +141,7 @@ on each, sends small fixes back to the next repo run, and sends David one messag
 to merge and what needs his eyes. David replies "merge N" there (or in any run's session); every
 merge still needs his yes.
 
-### Every scheduled run's report
+### Every scheduled run's report and David's answers
 
 These rules apply to every scheduled run, whatever its own prompt lists. Where a run prompt's
 report step names other table columns or leaves a step out, follow this section.
@@ -149,7 +150,7 @@ report step names other table columns or leaves a step out, follow this section.
    Summary line, CI, ready to merge? Add a Summary line to any open agent PR that lacks one
    before reporting.
 2. **After the chat report, send the same report to the app,** so it shows on the Waiting on you
-   page: follow [scheduled-run.md](scheduled-run.md) step 10 (write the JSON, start the Run report
+   page: follow [scheduled-run.md](scheduled-run.md) step 11 (write the JSON, start the Run report
    workflow in denkore-orchestrator, check it concluded success). If it still fails after one fix,
    say so in the chat report. Take the registry id and repo from the table below, and the mode
    from the run prompt.
@@ -163,6 +164,11 @@ report step names other table columns or leaves a step out, follow this section.
 3. **The report holds plain text only:** no secrets, no customer or contributor data. It goes to
    the orchestrator app, not to the project's own database, so a repo rule against database
    requests (Barzini Publishing sends none to its Supabase) still holds.
+4. **Before any work, fetch David's answers** to the last run's numbered decisions, which he can
+   type on the Waiting on you page: follow [scheduled-run.md](scheduled-run.md) step 5, with the
+   registry id from the table above. Each answer is David's reply to that one numbered decision,
+   as if he had typed it in the last run's session; it never widens what a run may do (no merge,
+   no live change). If the workflow fails, say so in the chat report and carry on without them.
 
 ## Source of truth
 

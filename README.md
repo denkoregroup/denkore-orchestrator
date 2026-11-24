@@ -97,12 +97,12 @@ CI runs typecheck, lint and tests on every pull request.
 | `lib/site-check/` | The prospect site check: four lights, a headline and the top three fixes from one report (all wording, and the booking link, in `copy.ts`) |
 | `components/site-check/` | The site check view and its QR code |
 | `lib/github/` | Reads open pull requests and their check runs from GitHub (`/waiting`) |
-| `lib/run-reports/` | What a scheduled Duet run reports when it finishes (PRs, notes, numbered decisions): the schema and the signed route that stores it. Runs send it through the **Run report** workflow, which signs it, so they never hold the secret |
+| `lib/run-reports/` | What a scheduled Duet run reports when it finishes (PRs, notes, numbered decisions): the schema and the signed route that stores it, and David's answers to its decisions from `/waiting`. Runs send reports through the **Run report** workflow and fetch answers through the **Run answers** workflow, which sign, so they never hold the secret |
 | `lib/audit-fixes/` | Fix with Conductor on a site report: what can be fixed in code (`lib/audits/checks/catalog.ts`), the run's prompt, and the buttons |
 | `lib/site-health/` | Stored audit reports, what changed between two of them, and the missed-run watchdog the tick runs |
 | `supabase/` | Migrations (schema, RLS, triggers), the local seed and the local stack config |
 | `registry/` | One YAML file per project |
-| `.github/workflows/` | CI, the Conductor tick, the daily site audit, the manual migration deploy and the Run report relay |
+| `.github/workflows/` | CI, the Conductor tick, the daily site audit, the manual migration deploy and the Run report and Run answers relays |
 
 Follow-ups are in `docs/backlog.md`; the audit slices are tracked in
 [#15](https://github.com/denkoregroup/denkore-orchestrator/issues/15).

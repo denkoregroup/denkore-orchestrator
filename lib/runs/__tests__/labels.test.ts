@@ -38,6 +38,11 @@ describe("site fix events", () => {
     expect(eventDescription("audit.fix_verified", {})).toBe("Verified by a later audit report");
     expect(eventDescription("audit.fix_verified", { report_started_at: "soon" })).toBe("Verified by a later audit report");
   });
+
+  it("names the project and the question number for an answer to a run", () => {
+    expect(eventDescription("run.answered", { registry_id: "honeybees", decision_number: 2, answer: "Yes" })).toBe("Answered question 2 from the honeybees run");
+    expect(eventDescription("run.answered", {})).toBe("Answered a scheduled run's question");
+  });
 });
 
 describe("eventDescription and actorLabel", () => {
