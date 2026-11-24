@@ -132,6 +132,30 @@ Each repo can have a scheduled run: a fresh session that follows
 [scheduled-run.md](scheduled-run.md). It never merges on its own; David replies "merge N" in that
 run's session.
 
+### Every scheduled run's report
+
+These rules apply to every scheduled run, whatever its own prompt lists. Where a run prompt's
+report step names other table columns or leaves a step out, follow this section.
+
+1. **The PR table quotes each PR's Summary line word for word.** Columns: linked number, its
+   Summary line, CI, ready to merge? Add a Summary line to any open agent PR that lacks one
+   before reporting.
+2. **After the chat report, send the same report to the app,** so it shows on the Waiting on you
+   page: follow [scheduled-run.md](scheduled-run.md) step 10 (write the JSON, start the Run report
+   workflow in denkore-orchestrator, check it concluded success). If it still fails after one fix,
+   say so in the chat report. Take the registry id and repo from the table below, and the mode
+   from the run prompt.
+
+   | Run's repo | registryId | repo |
+   | --- | --- | --- |
+   | honeybees | `honeybees` | `denkoregroup/honeybees` |
+   | barzini-publishing | `barzini-publishing` | `denkoregroup/barzini-publishing` |
+
+   A repo that isn't in this table sends no report to the app; say so in the chat report.
+3. **The report holds plain text only:** no secrets, no customer or contributor data. It goes to
+   the orchestrator app, not to the project's own database, so a repo rule against database
+   requests (Barzini Publishing sends none to its Supabase) still holds.
+
 ## Source of truth
 
 GitHub (issues, labels, epics, PRs) is the roadmap. Any board, dashboard or queue in a guide is a
