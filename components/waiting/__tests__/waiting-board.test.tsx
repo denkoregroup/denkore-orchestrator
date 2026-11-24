@@ -16,6 +16,7 @@ const base: WaitingPull = {
   checks: "passing",
   conflicts: false,
   stage: "ready",
+  summary: "Adds an agent guide so every session follows the same rules. Docs only, no risk to the site.",
 };
 
 describe("WaitingBoard", () => {
@@ -98,5 +99,21 @@ describe("WaitingBoard", () => {
     expect(screen.queryByRole("alert")).toBeNull();
     expect(screen.getByText(/Not shown, because the GitHub token doesn.t include their repos: dclarkdev-com, ggrmusic-com\./)).toBeVisible();
     expect(screen.getByText("No pull request is waiting on you across your 3 projects.")).toBeVisible();
+  });
+
+  it("shows each PR's summary under its title, and says so when an agent PR has none", () => {
+    render(
+      <WaitingBoard
+        data={{
+          configured: true,
+          pulls: [base, { ...base, number: 62, summary: null, url: "https://github.com/denkoregroup/honeybees/pull/62" }, { ...base, number: 7, byAgent: false, summary: null }],
+          unreadable: [],
+          notShared: [],
+          projectCount: 3,
+        }}
+      />,
+    );
+    expect(screen.getByText("Adds an agent guide so every session follows the same rules. Docs only, no risk to the site.")).toBeVisible();
+    expect(screen.getAllByText("No summary in this pull request yet.")).toHaveLength(1);
   });
 });

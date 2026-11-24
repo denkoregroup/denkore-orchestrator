@@ -1,7 +1,7 @@
 /**
  * @jest-environment node
  */
-import { listOpenPulls, listRepoPulls, stageOf, summarizeChecks } from "../pulls";
+import { listOpenPulls, listRepoPulls, stageOf, summarizeChecks, summaryOf } from "../pulls";
 
 type Routes = Record<string, { status?: number; body: unknown }>;
 
@@ -23,7 +23,7 @@ const pull = (n: number, extra: Record<string, unknown> = {}) => ({
   html_url: `https://github.com/o/r/pull/${n}`,
   draft: true,
   user: { login: "dclarktech302" },
-  body: "Changes...\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)",
+  body: `**Summary:** Does thing ${n}.\n\nChanges...\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)`,
   head: { sha: `sha${n}` },
   updated_at: `2026-11-24T1${n}:00:00Z`,
   ...extra,
@@ -51,6 +51,31 @@ describe("stageOf", () => {
   });
 });
 
+describe("summaryOf", () => {
+  it("takes the Summary line, bold or plain, from anywhere in the body", () => {
+    expect(summaryOf("**Summary:** Adds the cart badge. Low risk.\n\nBefore: ...")).toBe("Adds the cart badge. Low risk.");
+    expect(summaryOf("Closes #3.\n\nSummary: Fixes the hero photos.")).toBe("Fixes the hero photos.");
+    expect(summaryOf("**Summary**: Same thing, colon outside.")).toBe("Same thing, colon outside.");
+  });
+
+  it("keeps link words and drops markdown marks", () => {
+    expect(summaryOf("**Summary:** Builds on [#44](https://github.com/o/r/pull/44), `low` *risk*.")).toBe("Builds on #44, low risk.");
+  });
+
+  it("is null without a summary line, or with an empty one", () => {
+    expect(summaryOf(null)).toBeNull();
+    expect(summaryOf("Before: x\nAfter: y")).toBeNull();
+    expect(summaryOf("**Summary:**   ")).toBeNull();
+    expect(summaryOf("The summary: is not at the start")).toBeNull();
+  });
+
+  it("cuts a long summary at 300 characters", () => {
+    const s = summaryOf(`**Summary:** ${"word ".repeat(100)}`)!;
+    expect(s.length).toBeLessThanOrEqual(300);
+    expect(s.endsWith("…")).toBe(true);
+  });
+});
+
 describe("listRepoPulls", () => {
   it("summarizes each open PR with its checks, conflicts and author", async () => {
     const { fn, calls } = fakeFetch({
@@ -63,8 +88,8 @@ describe("listRepoPulls", () => {
     const result = await listRepoPulls(fn, "tok", "o/r");
     expect(result.error).toBeNull();
     expect(result.pulls).toEqual([
-      expect.objectContaining({ number: 1, byAgent: true, checks: "passing", conflicts: false, stage: "ready", draft: true }),
-      expect.objectContaining({ number: 2, byAgent: false, author: "ant", checks: "none", conflicts: true, stage: "needs_fix" }),
+      expect.objectContaining({ number: 1, byAgent: true, checks: "passing", conflicts: false, stage: "ready", draft: true, summary: "Does thing 1." }),
+      expect.objectContaining({ number: 2, byAgent: false, author: "ant", checks: "none", conflicts: true, stage: "needs_fix", summary: null }),
     ]);
     // Read-only, authenticated, never cached.
     for (const c of calls) {

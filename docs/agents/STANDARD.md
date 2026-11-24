@@ -54,6 +54,11 @@ says who owns it: a dedicated session or the conductor's scheduled run.
   architectural ones) / dependencies.
 - **Small PRs, one concern each.** "Part of #N" unless every checklist item is done. Ops-only
   leftovers are listed as remaining in the PR.
+- **Every PR body opens with a summary line** for David to read before he approves or asks:
+  `**Summary:** ` then one or two plain sentences on what the PR does for him and how risky it is
+  (for example "Adds the shipping page. Low risk: a new page, nothing existing changes."). No
+  jargon, file names or links. The Waiting on you page shows it under the PR, and reports to
+  David reuse it word for word.
 - **Every PR body covers** the changes, assumptions, tests, what remains and **what was not
   verified.**
 - **Ask before any change in a live system:** Shopify admin, Vercel settings, DNS, a database. A

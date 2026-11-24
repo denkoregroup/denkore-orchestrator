@@ -28,7 +28,9 @@ Work
 8. Open DRAFT PRs. Wait for every helper to finish before ending your turn.
 
 Report (SendUserMessage, then a push notification only if a decision is waiting)
-9. A table of PRs (linked number, what, CI, ready?), three notes or fewer, numbered decisions.
+9. A table of PRs (linked number, its Summary line word for word, CI, ready?), three notes or
+   fewer, numbered decisions. Every PR you open starts with a Summary line (STANDARD.md); add one
+   to any open agent PR that lacks it.
    Product-owner level. Every issue and PR is a markdown link.
 10. Send the same report to the app, so it shows on the Waiting on you page. Write it as one
     JSON object to /tmp/run-report.json (fields below), then start the Run report workflow:
