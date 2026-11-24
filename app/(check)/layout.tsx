@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { Bricolage_Grotesque, JetBrains_Mono, Source_Sans_3 } from "next/font/google";
 
 // Variable fonts: Bricolage Grotesque goes down to weight 200 for the headline's light middle words.
@@ -6,7 +7,8 @@ const sourceSans = Source_Sans_3({ subsets: ["latin"], variable: "--font-source-
 const jetbrainsMono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-jetbrains-mono" });
 
 /** The site check has no app chrome: a dark screen to show across a table, and white paper when printed. */
-export default function CheckLayout({ children }: LayoutProps<"/">) {
+// Not LayoutProps<"/">: that type also lists the app's summary slot, which this group doesn't have.
+export default function CheckLayout({ children }: Readonly<{ children: ReactNode }>) {
   return (
     <div className={`${bricolage.variable} ${sourceSans.variable} ${jetbrainsMono.variable} site-check min-h-dvh bg-check-bg font-copy text-check-ink`}>
       {children}
