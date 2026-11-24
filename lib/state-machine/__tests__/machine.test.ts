@@ -42,6 +42,7 @@ function runAt(state: RunState, maxTestRetries = 3): RunContext {
 }
 
 const ALL_EVENTS: RunEvent[] = [
+  { type: "start_fix" },
   { type: "start" },
   { type: "spec_ready", commitSha: SHA_A },
   { type: "design_ready", commitSha: SHA_A },
@@ -83,6 +84,7 @@ describe("event-driven transitions", () => {
   // Every (non-terminal state, event) pair: either the expected next state or a rejection.
   const expectations: Record<string, RunState | null> = {
     "queued:start": "spec",
+    "queued:start_fix": "build_test",
     "spec:spec_ready": "spec_gate",
     "spec_gate:approve": "design",
     "spec_gate:request_changes": "spec",

@@ -33,6 +33,17 @@ export interface GateSnapshot {
   latestDecision: GateDecision | null;
 }
 
+/** What a run made from an audit report needs to know to be verified. */
+export interface FixSnapshot {
+  /** Ids of the findings the run was started for (the audit.fix_requested event); null if that event is missing. */
+  findingIds: string[] | null;
+  /**
+   * The first audit report for the project made after the run entered post_deploy_check, or null while there
+   * is none. Only looked up in that state.
+   */
+  nextReport: { id: string; startedAt: string; findingIds: string[] } | null;
+}
+
 /** Everything decide() needs to know about one run. */
 export interface RunSnapshot {
   runId: string;
@@ -56,6 +67,8 @@ export interface RunSnapshot {
    * They count as failed even if a late completion later rewrites the row.
    */
   timedOutStepKeys: string[];
+  /** Set only for a run made from an audit report (its prompt starts with the audit-fix marker). */
+  fix: FixSnapshot | null;
 }
 
 export type ConductorAction =
@@ -65,5 +78,7 @@ export type ConductorAction =
   | { type: "open_gate"; kind: GateKind; sha: string }
   | { type: "move_gate"; gateId: string; fromSha: string; sha: string }
   | { type: "escalate"; reason: string }
+  /** A later audit report shows the run's findings fixed: finish the run and record which report said so. */
+  | { type: "verify_fix"; reportId: string; reportStartedAt: string }
   /** A dispatched step that never reported back: mark it failed, then normal failure handling runs. */
   | { type: "fail_step"; stepKey: string; reason: "timed_out" };
