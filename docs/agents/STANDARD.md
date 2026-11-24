@@ -131,8 +131,14 @@ says who owns it: a dedicated session or the conductor's scheduled run.
 ## Scheduled runs
 
 Each repo can have a scheduled run: a fresh session that follows
-[scheduled-run.md](scheduled-run.md). It never merges on its own; David replies "merge N" in that
-run's session.
+[scheduled-run.md](scheduled-run.md). It works through the repo's **roadmap issue** (listed in
+[repos.md](repos.md)) in order, up to three items a run, and opens draft PRs. It never merges.
+
+A **Conductor review** runs after the repo runs ([review-run.md](review-run.md)). A fresh session
+that didn't write the code reviews every open agent PR across the repos, leaves a review comment
+on each, sends small fixes back to the next repo run, and sends David one message: what's ready
+to merge and what needs his eyes. David replies "merge N" there (or in any run's session); every
+merge still needs his yes.
 
 ### Every scheduled run's report
 
