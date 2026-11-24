@@ -21,7 +21,7 @@ const SECTIONS = [
 
 function PullCard({ pull }: { pull: WaitingPull }) {
   return (
-    <li className="space-y-2 rounded-lg border border-border p-4">
+    <li className="surface-card space-y-2 p-4">
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 text-sm text-muted">
         <span className="font-medium text-foreground">{pull.project}</span>
         <span>

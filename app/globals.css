@@ -1,21 +1,18 @@
 @import "tailwindcss";
 
+/* Night Harbor (#55): dark only. Obsidian behind everything, light alabaster cards (.surface-card),
+   one teal glow in the header. Teal (--signal) means something is open and needs you; brass
+   (--accent) means navigation. */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-  --muted: #6b7280;
-  --border: #e5e7eb;
-  --accent: #b45309;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-    --muted: #9ca3af;
-    --border: #27272a;
-    --accent: #f59e0b;
-  }
+  color-scheme: dark;
+  --background: #0d0f12;
+  --foreground: #f4f3ef;
+  --muted: #9aa3ad;
+  --border: #2a2f36;
+  --accent: #c59b27;
+  --signal: #4fd1c5;
+  --abyss: #0f4c5c;
+  --tile: #15181d;
 }
 
 @theme inline {
@@ -24,6 +21,11 @@
   --color-muted: var(--muted);
   --color-border: var(--border);
   --color-accent: var(--accent);
+  --color-signal: var(--signal);
+  --color-abyss: var(--abyss);
+  --color-tile: var(--tile);
+  --font-sans: var(--font-geist), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
 
   /* The site check page (see .site-check below). */
   --font-heading: var(--font-bricolage), ui-sans-serif, system-ui, sans-serif;
@@ -37,6 +39,27 @@
   --color-check-red: var(--check-red);
   --color-check-amber: var(--check-amber);
   --color-check-green: var(--check-green);
+}
+
+/* A light card on the dark ground: 14px corners, no glow. It redefines the tokens, so the
+   utilities inside it (text-muted, border-border, text-accent, bg-background) read as card colors. */
+.surface-card {
+  --background: #f4f3ef;
+  --foreground: #0d0f12;
+  --muted: #4b525b;
+  --border: #cfcabd;
+  /* Dark brass, nudged from #8a6c18 so small link text passes 4.5:1 on alabaster. */
+  --accent: #866818;
+  color-scheme: light;
+  background: var(--background);
+  color: var(--foreground);
+  border-radius: 14px;
+}
+
+/* The one glow: abyssal teal from the top right, fading into obsidian. Its brightest point sits just
+   above the box, so the brass and muted text on it keep 4.5:1 contrast. */
+.harbor-header {
+  background: radial-gradient(120% 90% at 85% -20%, var(--abyss) 0%, var(--background) 72%);
 }
 
 /* The site check is flat: a dark screen, and light ink on white paper. No glows, shadows or gradients. */
@@ -54,7 +77,7 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--font-geist), ui-sans-serif, system-ui, sans-serif;
 }
 
 /* Visible keyboard focus on every interactive element, in both themes. */
@@ -71,12 +94,19 @@ body {
 }
 
 @media print {
-  :root {
+  :root,
+  .surface-card {
+    color-scheme: light;
     --background: #ffffff;
     --foreground: #171717;
     --muted: #4b5563;
     --border: #d1d5db;
-    --accent: #b45309;
+    --accent: #866818;
+    --signal: #0f4c5c;
+  }
+
+  .harbor-header {
+    background: none;
   }
 
   .site-check {

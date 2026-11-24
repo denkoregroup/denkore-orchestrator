@@ -33,7 +33,7 @@ export function AnswerForm({
                 type="button"
                 onClick={() => setAnswer(o)}
                 aria-pressed={answer === o}
-                className="min-h-12 rounded-md border border-border px-3 aria-pressed:bg-foreground aria-pressed:text-background"
+                className="min-h-12 rounded-full border border-border px-4 aria-pressed:border-foreground aria-pressed:bg-foreground aria-pressed:font-semibold aria-pressed:text-signal"
               >
                 {o}
               </button>
