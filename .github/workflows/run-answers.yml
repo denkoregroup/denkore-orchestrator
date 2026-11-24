@@ -1,0 +1,45 @@
+name: Run answers
+
+# Prints David's answers to a project's newest run report (typed on the Waiting on you page) in
+# this job's log. A scheduled Duet run starts this workflow before it works and reads the log;
+# this job signs the request with STEP_WEBHOOK_SECRET, which the runs never see. See
+# docs/agents/scheduled-run.md. Anyone who can push to this repository can start it and read the
+# log, the same people who can change the app itself.
+#
+# Needs: the repository variable CONDUCTOR_TICK_URL (or RUN_ANSWERS_URL) and the secret
+# STEP_WEBHOOK_SECRET, both already set for the Conductor tick.
+
+on:
+  workflow_dispatch:
+    inputs:
+      registry_id:
+        description: "The project's registry id (registry/<id>.yaml), like honeybees"
+        required: true
+        type: string
+
+# The run's name carries the project, so two runs started at once can tell their jobs apart.
+run-name: Run answers for ${{ inputs.registry_id }}
+
+# Nothing by default. The one job below gets only what checkout needs.
+permissions: {}
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      # The repository is private: checkout needs read access, nothing more.
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # The registry id reaches the script only through the environment, never pasted into the
+      # shell command, so nothing in it can run as a command.
+      - name: Print the answers
+        run: node scripts/fetch-run-answers.mjs
+        env:
+          REGISTRY_ID: ${{ inputs.registry_id }}
+          RUN_ANSWERS_URL: ${{ vars.RUN_ANSWERS_URL }}
+          CONDUCTOR_TICK_URL: ${{ vars.CONDUCTOR_TICK_URL }}
+          STEP_WEBHOOK_SECRET: ${{ secrets.STEP_WEBHOOK_SECRET }}

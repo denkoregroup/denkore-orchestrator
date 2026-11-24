@@ -54,6 +54,7 @@ const EVENT_KIND_LABELS: Record<string, string> = {
   "audit.overdue": "A site hasn’t been audited on schedule",
   "audit.fix_requested": "Fix started from a site report",
   "audit.fix_verified": "Verified by a later audit report",
+  "run.answered": "Answered a scheduled run's question",
 };
 
 /** Plain-language label for known event kinds; the raw kind otherwise. */
@@ -80,6 +81,10 @@ export function eventDescription(kind: string, payload: unknown): string {
   if (kind === "audit.fix_verified" && payload && typeof payload === "object" && "report_started_at" in payload) {
     const startedAt = (payload as { report_started_at: unknown }).report_started_at;
     if (typeof startedAt === "string" && !Number.isNaN(Date.parse(startedAt))) return `Verified by report ${formatEt(startedAt)}`;
+  }
+  if (kind === "run.answered" && payload && typeof payload === "object" && "registry_id" in payload && "decision_number" in payload) {
+    const { registry_id: project, decision_number: number } = payload as { registry_id: unknown; decision_number: unknown };
+    if (typeof project === "string" && typeof number === "number") return `Answered question ${number} from the ${project} run`;
   }
   return eventKindLabel(kind);
 }

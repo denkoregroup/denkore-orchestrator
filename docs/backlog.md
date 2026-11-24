@@ -166,6 +166,11 @@ the env vars, walk through:
     green and `/waiting` shows the run under Latest runs and its questions under Decisions
     from your runs. Run it again with the same input: it stays green and nothing doubles.
     Change `repo` to another owner: the run goes red with the app's reason.
+22. Run answers: with a report from item 21 on `/waiting`, tap an option on decision 1 and
+    press Send. The answer shows under the question, the count drops by one, and Activity
+    lists a `run.answered` event. In the Actions tab run "Run answers" with `honeybees`:
+    the log prints the question and your answer between the "Answers from David" lines.
+    Sending the same decision again says it's already answered.
 
 ## Reopen a changes-requested gate at the same SHA
 

@@ -1,4 +1,5 @@
 import { EtTime } from "@/components/sites/et-time";
+import { AnswerForm } from "@/components/waiting/answer-form";
 import type { LatestRunReport } from "@/lib/data/run-reports";
 import type { RunReport } from "@/lib/run-reports/schema";
 
@@ -9,15 +10,16 @@ function pullUrl(repo: string, number: number) {
 }
 
 function SessionLink({ report }: { report: RunReport }) {
-  if (!report.sessionUrl) return <p className="text-sm text-muted">Answer by number in that run&apos;s chat.</p>;
+  if (!report.sessionUrl) return null;
   return (
     <a href={report.sessionUrl} target="_blank" rel="noopener noreferrer" className="inline-block min-h-12 py-3 text-sm font-medium text-accent hover:underline">
-      Answer in the run&apos;s session
+      Open the run&apos;s session
     </a>
   );
 }
 
-function DecisionCard({ report }: { report: RunReport }) {
+function DecisionCard({ latest }: { latest: LatestRunReport }) {
+  const { report } = latest;
   return (
     <li className="space-y-2 rounded-lg border border-border p-4">
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 text-sm text-muted">
@@ -26,21 +28,26 @@ function DecisionCard({ report }: { report: RunReport }) {
           Run finished <EtTime iso={report.finishedAt} />
         </span>
       </div>
-      <ol className="space-y-2">
-        {report.decisions.map((d) => (
-          <li key={d.number} className="break-words">
-            <span className="font-semibold">{d.number}.</span> {d.question}
-            {d.options && d.options.length > 0 && (
-              <ul className="mt-1 flex flex-wrap gap-2 text-xs" aria-label={`Options for decision ${d.number}`}>
-                {d.options.map((o) => (
-                  <li key={o} className="rounded border border-border px-1.5 py-0.5">
-                    {o}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </li>
-        ))}
+      <ol className="space-y-4">
+        {report.decisions.map((d) => {
+          const answered = latest.answers[d.number];
+          return (
+            <li key={d.number} className="break-words">
+              <span className="font-semibold">{d.number}.</span> {d.question}
+              {answered ? (
+                <p className="mt-1 text-sm">
+                  <span className="font-medium">Your answer:</span> {answered.answer}
+                  <span className="text-muted">
+                    {" "}
+                    · <EtTime iso={answered.answeredAt} />
+                  </span>
+                </p>
+              ) : (
+                <AnswerForm registryId={report.registryId} runReportId={latest.id} decisionNumber={d.number} options={d.options} />
+              )}
+            </li>
+          );
+        })}
       </ol>
       <SessionLink report={report} />
     </li>
@@ -95,16 +102,17 @@ function RunCard({ report }: { report: RunReport }) {
 export function RunDecisions({ reports }: { reports: LatestRunReport[] }) {
   const withDecisions = reports.filter((r) => r.report.decisions.length > 0);
   if (withDecisions.length === 0) return null;
-  const decisionCount = withDecisions.reduce((n, r) => n + r.report.decisions.length, 0);
+  // Still waiting on you: the decisions you haven't answered.
+  const decisionCount = withDecisions.reduce((n, r) => n + r.report.decisions.filter((d) => !r.answers[d.number]).length, 0);
   return (
     <section aria-labelledby="waiting-decisions" className="space-y-2">
       <h2 id="waiting-decisions" className="font-semibold">
         Decisions from your runs ({decisionCount})
       </h2>
-      <p className="text-sm text-muted">Each run&apos;s newest questions. Answer by number in the run&apos;s session.</p>
+      <p className="text-sm text-muted">Each run&apos;s newest questions. The next run on that project reads your answers before it starts work.</p>
       <ul className="space-y-3">
         {withDecisions.map((r) => (
-          <DecisionCard key={r.report.registryId} report={r.report} />
+          <DecisionCard key={r.report.registryId} latest={r} />
         ))}
       </ul>
     </section>
