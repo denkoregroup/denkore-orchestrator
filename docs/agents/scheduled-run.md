@@ -66,6 +66,9 @@ run that follows reviews the PRs and notifies David)
     [{number, title, what (the PR's Summary line), checks: passing|failing|running|none,
     ready: true|false}];
     notes [three or fewer]; decisions [{number, question, options? [short answers]}].
+    The app refuses a report with any field over its limit, in characters: title 200, what 300,
+    summary 600, each note 400, question 500, each option 120 (five options at most), a
+    review's reason 300. Shorten the text; never cut a sentence off mid-way.
 
 Never: merge, mark ready, change a live system, create issues, or contact the client. David
 replies "merge N" in this session.
